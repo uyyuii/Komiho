@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.diagnostic.DiagLog
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import eu.kanade.tachiyomi.util.PdfRenderPostProcess
 import eu.kanade.tachiyomi.util.pdf.PdfPasswordException
 import eu.kanade.tachiyomi.util.pdf.PdfPasswordHolder
 import eu.kanade.tachiyomi.util.pdf.PdfParser
@@ -280,6 +281,22 @@ internal class PdfPageLoader private constructor(
 
     private fun openStream(index: Int): InputStream {
         check(!isRecycled) { "PDF 页面读取时加载器已被回收——重载即恢复" }
+
+        // Komiho: 字节路径（双页 / 超大页回落 / legacy）不经过 PdfRenderPostProcess.process()，
+        // 原本完全没有留白。留白开启时在这里就地补白，保证与位图旁路口径一致。
+        // 注意 encodedCache 只存「渲染后编码字节」，这里在缓存读取之后、返回之前对字节对应的
+        // 位图补白不可行（字节非位图），因此改为：若留白开启，走专门的 renderPage→补白→编码路径，
+        // 且不经 encodedCache（缓存命中会返回未补白的旧字节）。
+        val marginEnabled = runCatching {
+            Injekt.get<ReaderPreferences>().pdfCropMarginEnabled.get()
+        }.getOrDefault(false)
+        if (marginEnabled) {
+            val bmp = renderPage(index)
+                ?: throw IllegalStateException("PDF 第 ${index + 1} 页无法渲染（可能已损坏）")
+            val padded = PdfRenderPostProcess.addCropMargin(bmp)
+            // encodeForDisplay 会回收 padded；其返回的字节已带留白，直接交给下游解码/裁边。
+            return ByteArrayInputStream(PdfRenderFallback.encodeForDisplay(padded))
+        }
 
         // ① 直通 A：PDFium 对象 API —— 不依赖自写解析器，页树残缺的文件也能抽。
         val extractorHandle = extractorOrNull()

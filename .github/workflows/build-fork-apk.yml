@@ -1,0 +1,123 @@
+name: Build Komiho APK (fork, no secrets)
+
+# Komiho fork 自助编译通道：
+# - 不依赖原仓库的 KOMIHO_*_KEYSTORE_BASE64 secrets（fork 默认不会继承）。
+# - 每次构建用 keytool 现场生成一个临时 release 签名，保证 assembleRelease 能签名出可安装的 APK。
+# - 构建 arm64-v8a 单 ABI Release 包，关闭代码压缩以缩短耗时。
+# - 产物同时上传为 Actions artifact 和一个 prerelease，方便直接拿到下载链接。
+
+"on":
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Gradle
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', '**/gradle.properties') }}
+          restore-keys: |
+            gradle-
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Write local.properties
+        run: |
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+          cat local.properties
+
+      - name: Grant gradlew execute permission
+        run: chmod +x gradlew
+
+      - name: Generate temporary release keystore
+        # app/build.gradle.kts 的 komihoRelease 在 keystore/komiho-release.jks 存在时使用
+        # 默认口令 komihorelease123 / alias komiho-release / PKCS12；这里按此约定现造一把。
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v -storetype PKCS12 \
+            -keystore keystore/komiho-release.jks \
+            -alias komiho-release -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass komihorelease123 -keypass komihorelease123 \
+            -dname "CN=Komiho Fork CI, OU=CI, O=Komiho, L=Unknown, ST=Unknown, C=CN" >/dev/null 2>&1
+          keytool -list -keystore keystore/komiho-release.jks \
+            -storetype PKCS12 -storepass komihorelease123 | head -6
+
+      - name: Build release APK (arm64-v8a)
+        run: |
+          ./gradlew assembleRelease -Pdisable-code-shrink -PkomihoAbi=arm64-v8a \
+            --no-daemon --stacktrace
+
+      - name: Collect APK
+        id: apk
+        run: |
+          set -e
+          APK_DIR="$GITHUB_WORKSPACE/app/build/outputs/apk/release"
+          echo "Release outputs:"
+          ls -la "$APK_DIR"
+          SRC=$(find "$APK_DIR" -maxdepth 1 -name 'app-*-release.apk' | head -1)
+          if [ -z "$SRC" ]; then
+            echo "::error::no release APK found"
+            exit 1
+          fi
+          cp "$SRC" "$GITHUB_WORKSPACE/komiho-fork-arm64-v8a.apk"
+          ls -lh "$GITHUB_WORKSPACE/komiho-fork-arm64-v8a.apk"
+          echo "path=$GITHUB_WORKSPACE/komiho-fork-arm64-v8a.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: komiho-fork-arm64-v8a
+          path: komiho-fork-arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK to a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="fork-ci-${{ github.run_number }}"
+          APK="$GITHUB_WORKSPACE/komiho-fork-arm64-v8a.apk"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/komiho-fork-arm64-v8a.apk"
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Komiho fork CI #${{ github.run_number }}" \
+            --notes "Fork build from ${{ github.sha }}. Features: keep list scroll on delete, long-press file info, folder shortcuts on Recent/History." \
+            --prerelease || true
+
+          for attempt in 1 2 3; do
+            if gh release upload "$TAG" "$APK" --repo "${{ github.repository }}" --clobber; then
+              break
+            fi
+            echo "::warning::release upload attempt $attempt failed, retrying"
+            sleep 20
+          done
+
+          echo "### APK ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "Direct download: $URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "DIRECT_URL=$URL" >> "$GITHUB_ENV"

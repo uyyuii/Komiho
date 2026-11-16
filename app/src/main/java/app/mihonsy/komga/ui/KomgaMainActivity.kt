@@ -110,7 +110,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ViewList
+// SY --> Komiho: 文件夹快捷方式（最近页 / 历史页共用）
+import app.mihonsy.komga.data.BrowseShortcut
+import app.mihonsy.komga.data.BrowseShortcutStore
+// SY <--
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.List
@@ -897,6 +902,30 @@ private fun KomgaMainScreen(
     }
     // SY <--
 
+    // SY --> Komiho: 打开「文件夹快捷方式」——与 openLocationInApp 的区别是：快捷方式的
+    // target 本身就是**目录**（不是文件），所以本地要保留最后一段（不 dropLast），
+    // WebDAV 的 dirUrl 也直接作为目录定位。两者都先切到对应来源再置导航请求。
+    fun openShortcut(shortcut: BrowseShortcut) {
+        if (shortcut.isWebDav) {
+            val conn = runCatching { WebDavConnectionStore.all() }
+                .getOrDefault(emptyList())
+                .firstOrNull { shortcut.target.startsWith(it.baseUrl) }
+                ?: return
+            webdavBrowseNavRequest = shortcut.target
+            selectSource(SourceEntry(SOURCE_ID_WEBDAV_PREFIX + conn.id, SourceKind.WebDav, conn.displayName()))
+        } else {
+            // target 是目录真实绝对路径；转成相对浏览根的路径段。LocalFileBrowser 的
+            // navRequest 消费端会 dropLast(1)（把末段当文件名），故这里额外补一个哨兵段，
+            // 使 dropLast 后正好落在目标目录本身。
+            val rel = localSourceFs.relativeFromBase(shortcut.target)
+                ?: shortcut.target.trim('/')
+            localBrowseNavRequest = "$rel/__dir__"
+            selectSource(SourceEntry(SOURCE_ID_LOCAL, SourceKind.Local, localName))
+        }
+        currentTab = MainTab.Browse.ordinal
+    }
+    // SY <--
+
     /**
      * Komiho: 由章节 url 反推所属来源 id（「继续阅读」启动模式用）。
      * 用 chapterUrl 前缀判断、而非 manga.source —— 本地 / WebDAV / SMB 三者共用 LocalSource.ID，
@@ -1399,6 +1428,7 @@ private fun KomgaMainScreen(
                             context.startActivity(ReaderActivity.newIntent(context, mangaId, chapterId, page))
                         },
                         onOpenLocation = { openLocationInApp(it) },
+                        onOpenShortcut = ::openShortcut,
                     )
                     // SY <--
                     MainTab.Home -> HomeTab(
@@ -1559,6 +1589,19 @@ private fun KomgaMainScreen(
                         onOpenLocation = { openLocationInApp(it) },
                         clearOpen = localHistoryClearOpen,
                         onClearOpenChange = { localHistoryClearOpen = it },
+                        // SY --> Komiho: 顶部复用「最近」页来源卡片 + 文件夹快捷方式。
+                        dashboardEntries = dashboardEntries,
+                        onOpenSource = ::openSourceFromDashboard,
+                        onResumeReading = { entry, mangaId, chapterId, page, chapterUrl ->
+                            if (entry.kind == SourceKind.Komga) {
+                                openSourceFromDashboard(entry)
+                            } else {
+                                openLocationInApp(chapterUrl)
+                            }
+                            context.startActivity(ReaderActivity.newIntent(context, mangaId, chapterId, page))
+                        },
+                        onOpenShortcut = ::openShortcut,
+                        // SY <--
                     )
                     MainTab.Bookmarks -> BookmarksTabLocal(
                         refreshTick = refreshTick,
@@ -6178,16 +6221,24 @@ private fun LocalFileBrowser(
     LaunchedEffect(base) { restoreStackForBase() }
     // SY <--
 
+    // Komiho: 记住「当前目录」的滚动位置，供加载完成后恢复。
+    // 除了切换目录（navigateTo），删除/重命名/移动/新建等会触发 refreshTick++ 重列目录的
+    // 操作也必须在 refreshTick++ **之前**调用这里 —— 否则恢复效果读到的还是进入该目录时
+    // 存下的旧值（通常 (0,0)），表现为「删完一部漫画列表跳回第一行」。
+    fun rememberCurrentScroll() {
+        localBrowseScrollMemory[scrollKey] = if (displayMode == LibraryDisplayMode.List) {
+            browseListState.firstVisibleItemIndex to browseListState.firstVisibleItemScrollOffset
+        } else {
+            browseGridState.firstVisibleItemIndex to browseGridState.firstVisibleItemScrollOffset
+        }
+    }
+
     // SY --> Komiho: 统一导航入口——改栈并（全权限模式）记最后一次访问目录的完整路径，
     // 供下次进浏览 tab 恢复。手动下钻/面包屑/返回键/打开文件位置都走这里。
     fun navigateTo(newStack: List<String>) {
         if (newStack != stack) {
             // 离开当前目录前记下滚动位置，返回这一级时恢复（见下方 LaunchedEffect）。
-            localBrowseScrollMemory[scrollKey] = if (displayMode == LibraryDisplayMode.List) {
-                browseListState.firstVisibleItemIndex to browseListState.firstVisibleItemScrollOffset
-            } else {
-                browseGridState.firstVisibleItemIndex to browseGridState.firstVisibleItemScrollOffset
-            }
+            rememberCurrentScroll()
         }
         stack = newStack
         if (hasAllFilesAccess) {
@@ -6252,6 +6303,9 @@ private fun LocalFileBrowser(
     var showMoveDialog by remember { mutableStateOf(false) }
     var movePickStack by remember { mutableStateOf<List<String>>(emptyList()) }
     var movePickDirs by remember { mutableStateOf<List<UniFile>>(emptyList()) }
+    // Komiho: 长按文件项弹出的「文件信息」对话框目标项。以前长按直接进入多选，
+    // 现在长按先看信息（大小/路径/修改时间），多选改由信息框里的按钮进入，不丢功能。
+    var infoEntry by remember { mutableStateOf<LocalEntry?>(null) }
 
     // 选中集合的唯一入口。取消掉最后一项时自动退出多选 —— 否则顶栏停在「已选 0 项」、
     // 底栏三格全灰，必须手动点 × 才能出来。
@@ -6309,7 +6363,10 @@ private fun LocalFileBrowser(
                                     if (ok) "已创建文件夹「$name」" else "创建失败：无写入权限或同名已存在",
                                     Toast.LENGTH_SHORT,
                                 ).show()
-                                if (ok) refreshTick++
+                                if (ok) {
+                                    rememberCurrentScroll() // 重列目录前记住位置，删/增都不跳回顶部
+                                    refreshTick++
+                                }
                             }
                         }
                     },
@@ -6369,6 +6426,9 @@ private fun LocalFileBrowser(
                                 },
                                 Toast.LENGTH_SHORT,
                             ).show()
+                            // Komiho: 删除后列表会重列（refreshTick++）。若不先记住当前滚动位置，
+                            // 恢复效果会读到进入目录时的旧值（0,0）而跳回第一行。
+                            rememberCurrentScroll()
                             refreshTick++
                         }
                     },
@@ -6377,6 +6437,45 @@ private fun LocalFileBrowser(
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
             },
+        )
+    }
+    // Komiho: 长按文件项显示的基本信息（名称/类型/大小/修改时间/路径）。
+    // 路径用 fs.realPathOf 拿真实绝对路径；SAF 拿不到时回落到 UniFile 的 uri。
+    infoEntry?.let { info ->
+        val displayPath by produceState(initialValue = "", key1 = info.uni.uri.toString()) {
+            value = withContext(Dispatchers.IO) {
+                fs.realPathOf(info.uni) ?: info.uni.uri.toString()
+            }
+        }
+        val typeLabel = when {
+            info.isDirectory -> "文件夹"
+            info.isArchive -> "压缩包"
+            info.isImage -> "图片"
+            else -> "文件"
+        }
+        AlertDialog(
+            onDismissRequest = { infoEntry = null },
+            title = { Text("文件信息") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    InfoRow("名称", info.name)
+                    InfoRow("类型", typeLabel)
+                    if (!info.isDirectory) InfoRow("大小", formatFileSize(info.size))
+                    InfoRow("修改时间", formatDateTime(info.lastModified))
+                    InfoRow("路径", displayPath)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // 保留原「长按进入多选」能力：从信息框这里点「多选」即可。
+                        infoEntry = null
+                        selectionMode = true
+                        toggleSelected(info)
+                    },
+                ) { Text("多选") }
+            },
+            dismissButton = { TextButton(onClick = { infoEntry = null }) { Text("关闭") } },
         )
     }
     // Komiho (2026-11-06): 重命名（仅单选）。全盘模式 File.renameTo；SAF 用 DocumentsContract。
@@ -6426,6 +6525,7 @@ private fun LocalFileBrowser(
                                 ).show()
                                 if (ok) {
                                     exitFileSelection()
+                                    rememberCurrentScroll() // 重命名重列前记住位置
                                     refreshTick++
                                 }
                             }
@@ -6549,6 +6649,7 @@ private fun LocalFileBrowser(
                                 },
                                 Toast.LENGTH_SHORT,
                             ).show()
+                            rememberCurrentScroll() // 移动重列前记住位置
                             refreshTick++
                         }
                     },
@@ -6580,7 +6681,9 @@ private fun LocalFileBrowser(
         if (loading) return@LaunchedEffect
         // 没有记忆（第一次进这个目录）= 回到顶部；两个状态对象跨目录复用，不显式归零会
         // 停在上一个目录的索引上。
-        val index = localBrowseScrollMemory[scrollKey]?.first ?: 0
+        // 删除后条目变少：索引可能越过末尾，clamp 一下避免越界。
+        val index = (localBrowseScrollMemory[scrollKey]?.first ?: 0)
+            .coerceAtMost(maxOf(0, entries.size - 1))
         val offset = localBrowseScrollMemory[scrollKey]?.second ?: 0
         if (displayMode == LibraryDisplayMode.List) {
             browseListState.scrollToItem(index, offset)
@@ -6903,6 +7006,23 @@ private fun LocalFileBrowser(
                     contentDescription = "新建文件夹",
                 )
             }
+            // SY --> Komiho: 把当前文件夹加为「最近」页快捷方式。
+            IconButton(onClick = {
+                val real = fs.realPathOf(current)
+                if (real != null) {
+                    val dirName = current.name ?: real.trimEnd('/').substringAfterLast('/')
+                    BrowseShortcutStore.add(dirName, BrowseShortcut.KIND_LOCAL, real)
+                    Toast.makeText(context, "已添加快捷方式：$dirName", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, " SAF 模式下无法获取该目录路径", Toast.LENGTH_SHORT).show()
+                }
+            }) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "添加快捷方式到最近",
+                )
+            }
+            // SY <--
             IconButton(onClick = { searchActive = true }) {
                 Icon(
                     imageVector = Icons.Filled.Search,
@@ -6959,10 +7079,8 @@ private fun LocalFileBrowser(
                             clickable = selectionMode || isItemClickable(file),
                             progressText = listProgressLabel(fileProgress[file.name], progressReadLabel),
                             selected = selectedEntries.containsKey(file.uni.uri.toString()),
-                            onLongClick = {
-                                selectionMode = true
-                                toggleSelected(file)
-                            },
+                            // Komiho: 长按显示文件信息；多选入口见信息框里的「多选」按钮。
+                            onLongClick = { infoEntry = file },
                             onOpen = {
                                 if (selectionMode) toggleSelected(file) else onOpenItem(file)
                             },
@@ -6995,10 +7113,8 @@ private fun LocalFileBrowser(
                             clickable = selectionMode || isItemClickable(file),
                             progressText = gridProgressLabel(fileProgress[file.name], progressReadLabel),
                             selected = selectedEntries.containsKey(file.uni.uri.toString()),
-                            onLongClick = {
-                                selectionMode = true
-                                toggleSelected(file)
-                            },
+                            // Komiho: 长按显示文件信息；多选入口见信息框里的「多选」按钮。
+                            onLongClick = { infoEntry = file },
                             onClick = {
                                 if (selectionMode) toggleSelected(file) else onOpenItem(file)
                             },
@@ -8037,6 +8153,7 @@ private fun WebDavBrowsePane(
 ) {
     val prefs = remember { Injekt.get<StoragePreferences>() }
     val dirBrowseFailed = composeStringResource(R.string.dir_browse_failed)
+    val context = LocalContext.current // Komiho: 添加快捷方式时弹 Toast 用
 
     // 显示模式 / 排序 / 列数：独立于本地浏览的偏好键持久化（用户要求「仅限当前模块」）。
     var displayMode by remember { mutableStateOf(LibraryDisplayMode.fromPref(prefs.webdavBrowseDisplayMode.get())) }
@@ -8399,6 +8516,18 @@ private fun WebDavBrowsePane(
                     }
                 }
             }
+            // SY --> Komiho: 把当前 WebDAV 目录加为「最近」页快捷方式。
+            IconButton(onClick = {
+                val dirName = webDavCrumbName(dirUrl)
+                BrowseShortcutStore.add(dirName, BrowseShortcut.KIND_WEBDAV, dirUrl)
+                Toast.makeText(context, "已添加快捷方式：$dirName", Toast.LENGTH_SHORT).show()
+            }) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "添加快捷方式到最近",
+                )
+            }
+            // SY <--
             IconButton(onClick = { searchActive = true }) {
                 Icon(
                     imageVector = Icons.Filled.Search,
@@ -9903,6 +10032,24 @@ private fun getFileStat(chapterUrl: String, file: UniFile?): FileStat {
     return s
 }
 
+/** 文件信息对话框里的一行「标签：值」，路径等长文本可换行。 */
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(
+            text = "$label：",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(min = 56.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 /** 格式化文件大小。 */
 private fun formatFileSize(bytes: Long): String = when {
     bytes >= 1024L * 1024 * 1024 * 1024 -> "%.2f TB".format(bytes / (1024.0 * 1024 * 1024 * 1024))
@@ -10198,6 +10345,71 @@ private data class SourceCardSummary(
     val canResume: Boolean get() = recents.isNotEmpty()
 }
 
+/**
+ * 文件夹快捷方式条：「最近」页与「历史」页顶部共用。
+ * 在本地 / WebDAV 浏览页顶栏点星标收藏当前目录后，这里可一键直达。
+ */
+@Composable
+private fun ShortcutStrip(onOpen: (BrowseShortcut) -> Unit) {
+    val version by BrowseShortcutStore.version.collectAsState()
+    val shortcuts = remember(version) { BrowseShortcutStore.all() }
+    if (shortcuts.isEmpty()) return
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = "文件夹快捷方式",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            shortcuts.forEach { shortcut ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clickable { onOpen(shortcut) }
+                            .padding(start = 8.dp, end = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (shortcut.isWebDav) Icons.Filled.FolderOpen else Icons.Filled.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = shortcut.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 130.dp),
+                        )
+                        IconButton(
+                            onClick = { BrowseShortcutStore.remove(shortcut.id) },
+                            modifier = Modifier.size(30.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "移除快捷方式",
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun SourceDashboardPane(
     entries: List<SourceEntry>,
@@ -10207,6 +10419,11 @@ private fun SourceDashboardPane(
     onResumeReading: (entry: SourceEntry, mangaId: Long, chapterId: Long, page: Int, chapterUrl: String) -> Unit,
     /** 「打开文件位置」：切到对应来源的浏览页并定位到该文件所在目录（仅文件型来源可用）。 */
     onOpenLocation: (String) -> Unit,
+    /** 打开文件夹快捷方式（本地 / WebDAV 目录直达）。 */
+    onOpenShortcut: (BrowseShortcut) -> Unit,
+    /** true = 嵌入「历史」tab 的 LazyColumn item 内，不能自己再套垂直滚动。 */
+    embedded: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     // SY: 每个来源显示几条最近阅读 —— 已改为按来源独立配置（来源管理眼睛弹窗，0=隐藏），
@@ -10483,12 +10700,15 @@ private fun SourceDashboardPane(
         }
     }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+        modifier = modifier
+            .then(if (embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+            .then(if (embedded) Modifier else Modifier.verticalScroll(rememberScrollState()))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // SY --> Komiho: 文件夹快捷方式（最近页 / 历史页顶部共用）。
+        ShortcutStrip(onOpen = onOpenShortcut)
+        // SY <--
         entries.forEach { entry ->
             val recents = summaries[entry.id]?.recents.orEmpty()
             val typeLabel = when (entry.kind) {
@@ -10751,6 +10971,12 @@ private fun HistoryTabLocal(
     onOpenLocation: (String) -> Unit,
     clearOpen: Boolean,
     onClearOpenChange: (Boolean) -> Unit,
+    /** SY --> Komiho: 历史 tab 顶部嵌入「最近」页所需回调。 */
+    dashboardEntries: List<SourceEntry>,
+    onOpenSource: (SourceEntry) -> Unit,
+    onResumeReading: (entry: SourceEntry, mangaId: Long, chapterId: Long, page: Int, chapterUrl: String) -> Unit,
+    onOpenShortcut: (BrowseShortcut) -> Unit,
+    // SY <--
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -10806,13 +11032,36 @@ private fun HistoryTabLocal(
             .sortedByDescending { it.rep.readAt?.time ?: 0L }
     }
 
-    if (merged.isEmpty() && items.isEmpty()) {
-        LocalEmptyHint(Icons.Filled.History, composeStringResource(R.string.local_history_empty))
-        return
-    }
-
+    // SY --> Komiho: 历史 tab 顶部嵌入「最近」页（来源卡片 + 文件夹快捷方式），
+    // 下方保留原历史列表；无历史记录时也不能早退，否则最近页内容看不到。
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
-            items(merged, key = { it.chapterUrl }) { book ->
+        item {
+            Text(
+                text = "最近",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            SourceDashboardPane(
+                entries = dashboardEntries,
+                refreshTick = refreshTick,
+                onOpenSource = onOpenSource,
+                onResumeReading = onResumeReading,
+                onOpenLocation = onOpenLocation,
+                onOpenShortcut = onOpenShortcut,
+                embedded = true,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(
+                text = "历史记录",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+        if (merged.isEmpty() && items.isEmpty()) {
+            item { LocalEmptyHint(Icons.Filled.History, composeStringResource(R.string.local_history_empty)) }
+        }
+        items(merged, key = { it.chapterUrl }) { book ->
+    // SY <--
             val rep = book.rep
             val file by produceState<UniFile?>(initialValue = null, key1 = rep.chapterUrl) {
                 value = withContext(Dispatchers.IO) { resolveLocalFile(rep.chapterUrl) }

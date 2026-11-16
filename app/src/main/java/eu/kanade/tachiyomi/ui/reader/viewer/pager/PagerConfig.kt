@@ -1,4 +1,4 @@
-﻿package eu.kanade.tachiyomi.ui.reader.viewer.pager
+package eu.kanade.tachiyomi.ui.reader.viewer.pager
 
 import android.graphics.Color
 import androidx.annotation.ColorInt
@@ -211,6 +211,14 @@ class PagerConfig(
         readerPreferences.aiAreaDownscale
             .register({ }, { imagePropertyChangedListener?.invoke() })
         readerPreferences.aiAreaDownscaleStrength
+            .register({ }, { imagePropertyChangedListener?.invoke() })
+
+        // Komiho: PDF 裁边留白 —— 与 AI 增强同款：空写回只为触发 refreshAdapter()。
+        // 留白字段已在 enhancementCacheKey()（= imageFingerprint 首段），这里补上注册，
+        // 关闭设置对话框时 flush 才能重建当前页 —— 否则要翻页回来才看得到白边。
+        readerPreferences.pdfCropMarginEnabled
+            .register({ }, { imagePropertyChangedListener?.invoke() })
+        readerPreferences.pdfCropMarginPercent
             .register({ }, { imagePropertyChangedListener?.invoke() })
 
         readerPreferences.navigateToPan

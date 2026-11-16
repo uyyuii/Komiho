@@ -185,6 +185,18 @@ class ReaderPreferences(
         false,
     )
 
+    /**
+     * Komiho: PDF 专用「裁边留白」。开启后在 PDF 页四周补一圈白边，比例按较短边计算。
+     * 只由 PDF 渲染管线读取，普通图片/漫画章节不受影响。
+     */
+    val pdfCropMarginEnabled: Preference<Boolean> = preferenceStore.getBoolean(
+        "pref_pdf_crop_margin_enabled",
+        false,
+    )
+
+    /** 留白比例（百分比，0~20），用加减按钮调节。 */
+    val pdfCropMarginPercent: Preference<Int> = preferenceStore.getInt("pref_pdf_crop_margin_percent", 5)
+
     val webtoonSidePadding: Preference<Int> = preferenceStore.getInt("webtoon_side_padding", WEBTOON_PADDING_MIN)
 
     val readerHideThreshold: Preference<ReaderHideThreshold> = preferenceStore.getEnum(
@@ -459,6 +471,9 @@ class ReaderPreferences(
         append('|').append(cropBordersWebtoon.get())
         // Komiho: 深度裁剪边缘改变裁切结果（像素），必须进指纹。
         append('|').append(cropBordersAggressive.get())
+        // Komiho: PDF 裁边留白改变像素，必须进指纹，否则改完比例旧缓存不刷新。
+        append('|').append(if (pdfCropMarginEnabled.get()) 1 else 0)
+        append('|').append(pdfCropMarginPercent.get())
         // Komiho: E-Ink 灰阶化会改变**像素**，所以必须进指纹 —— 否则改了灰阶设置后，
         // pager 的 prepared pages 与 holder 的「这一对页已渲染」守卫都还认旧设置，
         // 用户得退出重进或一直划动才看到变化（与上面几个 AI 档位是同一个道理）。

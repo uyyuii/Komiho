@@ -1,7 +1,17 @@
 package eu.kanade.presentation.reader.settings
 
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +35,9 @@ import tachiyomi.presentation.core.components.SettingsChipRow
 import tachiyomi.presentation.core.components.SliderItem
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.text.NumberFormat
@@ -81,6 +94,57 @@ private fun einkAnimationOff(): Boolean {
     return einkMode && einkDisableAnimation
 }
 
+
+/**
+ * Komiho: PDF 专用「裁边留白」。
+ * 只有当前章节是 PDF 时才显示；用加减按钮按 1% 步进调节（0~20%），
+ * 实际留白由 PdfRenderPostProcess 在 PDF 位图上完成，普通漫画页不受影响。
+ */
+@Composable
+private fun ColumnScope.PdfCropMarginItem(screenModel: ReaderSettingsScreenModel) {
+    val isPdf by screenModel.isPdfFlow.collectAsState()
+    if (!isPdf) return
+
+    val enabled by screenModel.preferences.pdfCropMarginEnabled.collectAsState()
+    val percent by screenModel.preferences.pdfCropMarginPercent.collectAsState()
+
+    CheckboxItem(
+        label = "PDF 裁边留白",
+        pref = screenModel.preferences.pdfCropMarginEnabled,
+    )
+    if (enabled) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "留白比例",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            IconButton(
+                onClick = { screenModel.preferences.pdfCropMarginPercent.set((percent - 1).coerceAtLeast(0)) },
+                enabled = percent > 0,
+            ) {
+                Icon(Icons.Filled.Remove, contentDescription = "减少留白")
+            }
+            Text(
+                text = "$percent%",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.width(48.dp),
+            )
+            IconButton(
+                onClick = { screenModel.preferences.pdfCropMarginPercent.set((percent + 1).coerceAtMost(20)) },
+                enabled = percent < 20,
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "增加留白")
+            }
+        }
+    }
+}
 
 @Composable
 private fun ColumnScope.PagerViewerSettings(screenModel: ReaderSettingsScreenModel) {
@@ -161,6 +225,9 @@ private fun ColumnScope.PagerViewerSettings(screenModel: ReaderSettingsScreenMod
             }
         }
     }
+
+    // Komiho: PDF 裁边留白只对 PDF 章节显示。
+    PdfCropMarginItem(screenModel)
 
     CheckboxItem(
         label = stringResource(MR.strings.pref_landscape_zoom),
@@ -337,6 +404,8 @@ private fun ColumnScope.WebtoonViewerSettings(screenModel: ReaderSettingsScreenM
         pref = screenModel.preferences.cropBordersWebtoon,
     )
 
+    PdfCropMarginItem(screenModel)
+
     // SY -->
     CheckboxItem(
         label = stringResource(SYMR.strings.pref_smooth_scroll),
@@ -428,6 +497,8 @@ private fun ColumnScope.WebtoonWithGapsViewerSettings(screenModel: ReaderSetting
         label = stringResource(MR.strings.pref_crop_borders),
         pref = screenModel.preferences.cropBordersContinuousVertical,
     )
+
+    PdfCropMarginItem(screenModel)
 }
 // SY <--
 

@@ -6,6 +6,7 @@ import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.diagnostic.DiagLog
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.pdf.PdfPasswordException
 import eu.kanade.tachiyomi.util.pdf.PdfPasswordHolder
 import eu.kanade.tachiyomi.util.pdf.PdfParser
@@ -20,6 +21,8 @@ import java.io.IOException
 import java.io.InputStream
 import mihon.core.common.archive.RandomAccessSource
 import tachiyomi.core.common.util.lang.withIOContext
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 /**
  * 本地 / 远程 PDF 页加载器。
@@ -230,7 +233,12 @@ internal class PdfPageLoader private constructor(
      * 不会因为要判断直通而拖慢打开（解析器也只是首次用到时才建）。
      */
     private fun preRenderedProvider(index: Int): () -> Bitmap? = {
-        if (canPassthrough(index)) null else renderPage(index)
+        // Komiho: 开了「PDF 裁边留白」后，内嵌 JPEG 直通页也必须走 PDFium 渲染，
+        // 否则它们不经过 PdfRenderPostProcess，留白设置对这类页无效。
+        val marginEnabled = runCatching {
+            Injekt.get<ReaderPreferences>().pdfCropMarginEnabled.get()
+        }.getOrDefault(false)
+        if (!marginEnabled && canPassthrough(index)) null else renderPage(index)
     }
 
     /**

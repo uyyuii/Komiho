@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.util
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.os.SystemClock
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
@@ -34,6 +36,9 @@ object PdfRenderPostProcess {
 
     /**
      * 处理一张「已解码/已渲染」的位图，返回最终用于显示的位图（入参可能被回收）。
+     *
+     * 步骤：① 增强 → ② 透明压白 → ③ E-Ink 灰阶 → ④ PDF 专用裁边留白。
+     * 第 ④ 步读取的偏好只有 PDF 渲染页会到达这里，天然不会对普通漫画页生效。
      *
      * @param viewWidth / viewHeight 当前视图尺寸，仅用于长条页判定与面积回缩。
      */
@@ -123,6 +128,29 @@ object PdfRenderPostProcess {
                         dither = false,
                     ),
                 )
+            }
+        }
+
+        // ④ PDF 裁边留白：按较短边取百分比，四周补白。
+        // 只有 PDF 渲染页会走 PdfRenderPostProcess，所以普通图片/漫画章节不会受影响。
+        if (prefs.pdfCropMarginEnabled.get()) {
+            val percent = prefs.pdfCropMarginPercent.get().coerceIn(0, 20)
+            if (percent > 0 && !bmp.isRecycled && bmp.width > 0 && bmp.height > 0) {
+                val margin = (minOf(bmp.width, bmp.height) * percent / 100f).toInt().coerceAtLeast(1)
+                val padded = runCatching {
+                    Bitmap.createBitmap(
+                        bmp.width + margin * 2,
+                        bmp.height + margin * 2,
+                        Bitmap.Config.ARGB_8888,
+                    )
+                }.getOrNull()
+                if (padded != null) {
+                    val canvas = Canvas(padded)
+                    canvas.drawColor(Color.WHITE)
+                    canvas.drawBitmap(bmp, margin.toFloat(), margin.toFloat(), null)
+                    bmp.recycle()
+                    bmp = padded
+                }
             }
         }
 

@@ -1589,19 +1589,6 @@ private fun KomgaMainScreen(
                         onOpenLocation = { openLocationInApp(it) },
                         clearOpen = localHistoryClearOpen,
                         onClearOpenChange = { localHistoryClearOpen = it },
-                        // SY --> Komiho: 顶部复用「最近」页来源卡片 + 文件夹快捷方式。
-                        dashboardEntries = dashboardEntries,
-                        onOpenSource = ::openSourceFromDashboard,
-                        onResumeReading = { entry, mangaId, chapterId, page, chapterUrl ->
-                            if (entry.kind == SourceKind.Komga) {
-                                openSourceFromDashboard(entry)
-                            } else {
-                                openLocationInApp(chapterUrl)
-                            }
-                            context.startActivity(ReaderActivity.newIntent(context, mangaId, chapterId, page))
-                        },
-                        onOpenShortcut = ::openShortcut,
-                        // SY <--
                     )
                     MainTab.Bookmarks -> BookmarksTabLocal(
                         refreshTick = refreshTick,
@@ -7473,21 +7460,14 @@ private fun GridProgressBadge(text: String, modifier: Modifier = Modifier) {
 private val FolderCoverShape = RoundedCornerShape(6.dp)
 
 /**
- * Komiho (2026-11-06): 目录封面 —— 缩略图铺满，外圈描一圈主色当标识。
+ * Komiho: 目录封面 —— 缩略图铺满并裁圆角。
+ * 去掉原先那圈主色（蓝色）描边：它与文件封面外观不一致，且容易被当成选中态。
  * 取不到封面时由调用方回落到普通文件夹图标（不带任何装饰）。
  */
 @Composable
 private fun FolderCoverFrame(content: @Composable () -> Unit) {
-    // 尺寸与文件封面**完全一致**（铺满整个槽），只在外圈描一圈主色：靠颜色区分
-    // 「这是文件夹」，而不是靠缩小 / 换成横向图标（那样在竖槽里会和文件明显不一样大）。
     Box(modifier = Modifier.fillMaxSize().clip(FolderCoverShape)) {
         content()
-        // 描边单独画在上层，避免被内容盖住。形状是单圈圆角矩形 —— 只描一条外框。
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(2.dp, MaterialTheme.colorScheme.primary, FolderCoverShape),
-        )
     }
 }
 
@@ -10346,8 +10326,9 @@ private data class SourceCardSummary(
 }
 
 /**
- * 文件夹快捷方式条：「最近」页与「历史」页顶部共用。
- * 在本地 / WebDAV 浏览页顶栏点星标收藏当前目录后，这里可一键直达。
+ * 「最近」页的文件夹快捷方式区。
+ * 与最近阅读条目同样的整行布局：左侧封面槽 + 名称/路径，右侧三个点弹出菜单（打开/删除），
+ * 不再用小 × 紧贴名称，避免误触。
  */
 @Composable
 private fun ShortcutStrip(onOpen: (BrowseShortcut) -> Unit) {
@@ -10359,53 +10340,79 @@ private fun ShortcutStrip(onOpen: (BrowseShortcut) -> Unit) {
             text = "文件夹快捷方式",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp),
         )
-        Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            shortcuts.forEach { shortcut ->
+        Spacer(Modifier.height(4.dp))
+        shortcuts.forEach { shortcut ->
+            var menuExpanded by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(shortcut) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(40.dp, 54.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .height(36.dp)
-                            .clickable { onOpen(shortcut) }
-                            .padding(start = 8.dp, end = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = if (shortcut.isWebDav) Icons.Filled.FolderOpen else Icons.Filled.Folder,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = shortcut.name,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 130.dp),
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = shortcut.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = shortcut.target,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "快捷方式选项",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        IconButton(
-                            onClick = { BrowseShortcutStore.remove(shortcut.id) },
-                            modifier = Modifier.size(30.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "移除快捷方式",
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("打开") },
+                            onClick = {
+                                menuExpanded = false
+                                onOpen(shortcut)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除") },
+                            onClick = {
+                                menuExpanded = false
+                                BrowseShortcutStore.remove(shortcut.id)
+                            },
+                        )
                     }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -10971,12 +10978,6 @@ private fun HistoryTabLocal(
     onOpenLocation: (String) -> Unit,
     clearOpen: Boolean,
     onClearOpenChange: (Boolean) -> Unit,
-    /** SY --> Komiho: 历史 tab 顶部嵌入「最近」页所需回调。 */
-    dashboardEntries: List<SourceEntry>,
-    onOpenSource: (SourceEntry) -> Unit,
-    onResumeReading: (entry: SourceEntry, mangaId: Long, chapterId: Long, page: Int, chapterUrl: String) -> Unit,
-    onOpenShortcut: (BrowseShortcut) -> Unit,
-    // SY <--
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -11032,36 +11033,13 @@ private fun HistoryTabLocal(
             .sortedByDescending { it.rep.readAt?.time ?: 0L }
     }
 
-    // SY --> Komiho: 历史 tab 顶部嵌入「最近」页（来源卡片 + 文件夹快捷方式），
-    // 下方保留原历史列表；无历史记录时也不能早退，否则最近页内容看不到。
+    if (merged.isEmpty() && items.isEmpty()) {
+        LocalEmptyHint(Icons.Filled.History, composeStringResource(R.string.local_history_empty))
+        return
+    }
+
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
-        item {
-            Text(
-                text = "最近",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-            SourceDashboardPane(
-                entries = dashboardEntries,
-                refreshTick = refreshTick,
-                onOpenSource = onOpenSource,
-                onResumeReading = onResumeReading,
-                onOpenLocation = onOpenLocation,
-                onOpenShortcut = onOpenShortcut,
-                embedded = true,
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "历史记录",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-        if (merged.isEmpty() && items.isEmpty()) {
-            item { LocalEmptyHint(Icons.Filled.History, composeStringResource(R.string.local_history_empty)) }
-        }
         items(merged, key = { it.chapterUrl }) { book ->
-    // SY <--
             val rep = book.rep
             val file by produceState<UniFile?>(initialValue = null, key1 = rep.chapterUrl) {
                 value = withContext(Dispatchers.IO) { resolveLocalFile(rep.chapterUrl) }

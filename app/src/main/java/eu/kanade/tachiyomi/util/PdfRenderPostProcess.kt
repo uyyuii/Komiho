@@ -133,27 +133,41 @@ object PdfRenderPostProcess {
 
         // ④ PDF 裁边留白：按较短边取百分比，四周补白。
         // 只有 PDF 渲染页会走 PdfRenderPostProcess，所以普通图片/漫画章节不会受影响。
-        if (prefs.pdfCropMarginEnabled.get()) {
-            val percent = prefs.pdfCropMarginPercent.get().coerceIn(0, 20)
-            if (percent > 0 && !bmp.isRecycled && bmp.width > 0 && bmp.height > 0) {
-                val margin = (minOf(bmp.width, bmp.height) * percent / 100f).toInt().coerceAtLeast(1)
-                val padded = runCatching {
-                    Bitmap.createBitmap(
-                        bmp.width + margin * 2,
-                        bmp.height + margin * 2,
-                        Bitmap.Config.ARGB_8888,
-                    )
-                }.getOrNull()
-                if (padded != null) {
-                    val canvas = Canvas(padded)
-                    canvas.drawColor(Color.WHITE)
-                    canvas.drawBitmap(bmp, margin.toFloat(), margin.toFloat(), null)
-                    bmp.recycle()
-                    bmp = padded
-                }
-            }
-        }
+        bmp = addCropMargin(bmp)
 
         return Result(bmp, enhanceMillis)
+    }
+
+    /**
+     * PDF 专用「裁边留白」——单独抽出，供**不走 process() 的字节路径**复用。
+     *
+     * 背景：位图旁路（单页 / 条漫非拆分）由 [process] 第 ④ 步加留白；但双页模式、
+     * 超大页回落字节路径走 `PdfPageLoader.openStream()`，那里输出的是字节、不经过
+     * [process]，漏掉留白 —— 表现就是「横屏/双页下开了留白却没白边」。
+     * 字节路径在编码前把渲染位图过一遍本函数，两条路径口径就一致了。
+     *
+     * 注意：本函数**只补白**，不做 AI 增强 / E-Ink 灰阶 —— 字节路径后续还要经 Coil
+     * 解码器做增强与裁边，若在这里重复处理会增强两次。
+     *
+     * @return 补白后的新位图（入参会被回收）；留白关闭 / 比例为 0 / 位图无效时原样返回入参。
+     */
+    fun addCropMargin(bitmap: Bitmap): Bitmap {
+        val prefs = Injekt.get<ReaderPreferences>()
+        if (!prefs.pdfCropMarginEnabled.get()) return bitmap
+        val percent = prefs.pdfCropMarginPercent.get().coerceIn(0, 20)
+        if (percent <= 0 || bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) return bitmap
+        val margin = (minOf(bitmap.width, bitmap.height) * percent / 100f).toInt().coerceAtLeast(1)
+        val padded = runCatching {
+            Bitmap.createBitmap(
+                bitmap.width + margin * 2,
+                bitmap.height + margin * 2,
+                Bitmap.Config.ARGB_8888,
+            )
+        }.getOrNull() ?: return bitmap
+        val canvas = Canvas(padded)
+        canvas.drawColor(Color.WHITE)
+        canvas.drawBitmap(bitmap, margin.toFloat(), margin.toFloat(), null)
+        bitmap.recycle()
+        return padded
     }
 }

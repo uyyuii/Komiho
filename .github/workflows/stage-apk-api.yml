@@ -1,0 +1,39 @@
+name: Stage APK chunks for API download
+
+on:
+  workflow_dispatch:
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download latest APK and split into chunks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName -q '.[0].tagName')
+          echo "Staging release: $TAG"
+          mkdir -p /tmp/stage
+          gh release download "$TAG" --repo "${{ github.repository }}" -p '*.apk' -D /tmp/stage
+          APK=$(find /tmp/stage -name '*.apk' | head -1)
+          SIZE=$(stat -c%s "$APK")
+          echo "APK size: $SIZE"
+          rm -rf apk-staging && mkdir apk-staging
+          split -b 8000000 "$APK" apk-staging/chunk_
+          echo "$TAG" > apk-staging/TAG.txt
+          echo "$SIZE" > apk-staging/SIZE.txt
+          ls -la apk-staging/
+          git config user.name ci-bot
+          git config user.email ci@users.noreply.github.com
+          git checkout -B apk-delivery
+          git add -f apk-staging
+          git commit -m "stage APK chunks from $TAG"
+          git push -f origin apk-delivery
+          echo "Staged to apk-delivery branch"

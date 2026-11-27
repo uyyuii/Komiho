@@ -6,6 +6,10 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.7" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.7[/b]</changelogtext>
+        <changelogtext>[b]Fixed[/b] Bookshelf cover flashing when resuming from Recent/History: the reader opens first and folder navigation runs after it closes</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.6" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.6[/b]</changelogtext>
         <changelogtext>[b]Improved[/b] ZIP/CBZ first page: unencrypted entries are streamed in chunks instead of pre-copying the whole compressed entry</changelogtext>

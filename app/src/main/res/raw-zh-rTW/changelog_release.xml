@@ -5,6 +5,10 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.7" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.7[/b]</changelogtext>
+        <changelogtext>[b]修復[/b] 從最近閱讀或歷史續讀時書架封面一閃而過：先進入閱讀器，關閉後再定位到書所在目錄</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.6" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.6[/b]</changelogtext>
         <changelogtext>[b]優化[/b] ZIP/CBZ 首屏：未加密條目改按塊直讀，不再先把整條壓縮資料複製進記憶體</changelogtext>

@@ -1,5 +1,9 @@
 # Komiho Changelog
 
+## v1.8.7 (2026-11-27)
+
+- Fixed bookshelf cover flashing when resuming from Recent/History: the reader now opens first, and the folder navigation is applied only after the reader closes
+
 ## v1.8.6 (2026-11-27)
 
 - Improved ZIP/CBZ first page: unencrypted entries in the central-directory reader are now streamed in chunks instead of copying the whole compressed entry into memory first, reducing the pre-decode memory peak

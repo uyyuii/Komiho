@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.7" changeDate="November 27,2026">
+        <changelogtext>[b]Komiho 1.8.7[/b]</changelogtext>
+        <changelogtext>[b]修复[/b] 从最近阅读或历史续读时书架封面一闪而过：先进入阅读器，关闭后再定位到书所在目录</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.6" changeDate="November 27,2026">
         <changelogtext>[b]Komiho 1.8.6[/b]</changelogtext>
         <changelogtext>[b]优化[/b] ZIP/CBZ 首屏：未加密条目按块直读，不再先把整条压缩数据复制进内存</changelogtext>

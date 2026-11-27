@@ -18,6 +18,10 @@ import kotlin.math.roundToInt
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+// SY --> Komiho 1.8.7: 阅读器关闭回调——续读的目录定位延后到这里执行。
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+// SY <--
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -374,6 +378,14 @@ class KomgaMainActivity : KomgaBaseActivity() {
     // Incremented on every onResume so the tabs reload data when returning
     // from the reader (read progress / unread counts change while reading).
     private val refreshSignal = MutableStateFlow(0)
+    // SY --> Komiho 1.8.7: 续读时先只开阅读器，书所在目录的定位等它关闭后再做。
+    // 用 ActivityResult 回调而不是 onResume：onResume 在冷启动时也会触发，
+    // 会把还没进阅读器的 pending 导航提前消费掉（书架封面闪现的老问题）。
+    private val readerReturnSignal = MutableStateFlow(0)
+    private val readerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { readerReturnSignal.update { it + 1 } }
+    // SY <--
     // Filter passed from the Series detail page (tap a tag/author → jump here
     // and filter the Library by it, Komga WebUI parity). Emitted both on the
     // initial onCreate and on subsequent onNewIntent (CLEAR_TOP+SINGLE_TOP
@@ -390,7 +402,11 @@ class KomgaMainActivity : KomgaBaseActivity() {
         val v = intent?.getStringExtra("filterValue")
         if (!t.isNullOrBlank() && !v.isNullOrBlank()) filterSignal.value = t to v
         intent?.getIntExtra(EXTRA_TAB, -1)?.takeIf { it >= 0 }?.let { tabSignal.value = it }
-        setContent { KomihoTheme { KomgaMainScreen(refreshSignal, filterSignal, tabSignal) } }
+        setContent {
+            KomihoTheme {
+                KomgaMainScreen(refreshSignal, filterSignal, tabSignal, readerReturnSignal, readerLauncher)
+            }
+        }
 
         // SY --> Komiho: WebDAV 同步触发条件——「应用启动时」；并注册「回到前台」触发（含息屏亮屏解锁）。
         KomihoSync.autoSync(applicationContext, KomihoSync.TRIGGER_APP_START)
@@ -565,6 +581,10 @@ private fun KomgaMainScreen(
     refreshSignal: MutableStateFlow<Int>,
     filterSignal: MutableStateFlow<Pair<String, String>?>,
     tabSignal: MutableStateFlow<Int?>,
+    // SY --> Komiho 1.8.7: 阅读器关闭信号 + 启动器（见 openReaderAfterNav）。
+    readerReturnSignal: MutableStateFlow<Int>,
+    readerLauncher: ActivityResultLauncher<Intent>,
+    // SY <--
 ) {
     val context = LocalContext.current
     val prefs = remember { KomgaPreferences(context.applicationContext) }
@@ -904,6 +924,28 @@ private fun KomgaMainScreen(
     }
     // SY <--
 
+    // SY --> Komiho 1.8.7: 续读时「先定位目录再启动阅读器」会让 Compose 在下一帧把
+    // 当前页（最近/历史）重组成 Browse 书架页；阅读器 push 转场有 195ms 交叉淡入淡出，
+    // 旧页仍可见，书架封面（多为缓存命中、瞬间绘出）就一闪而过。改为把定位动作暂存，
+    // 只启动阅读器，等它关闭（readerReturnSignal 递增）再执行。
+    // 用 lambda 而不是结构化 target：Komga 走 openSourceFromDashboard，文件型走
+    // openLocationInApp，两条既有路由都不重复实现。
+    var pendingReaderNav by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun openReaderAfterNav(intent: Intent, applyNavAfter: () -> Unit) {
+        pendingReaderNav = applyNavAfter
+        readerLauncher.launch(intent)
+    }
+
+    val readerReturnTick by readerReturnSignal.collectAsState()
+    LaunchedEffect(readerReturnTick) {
+        if (readerReturnTick == 0) return@LaunchedEffect
+        val applyNav = pendingReaderNav ?: return@LaunchedEffect
+        pendingReaderNav = null
+        applyNav()
+    }
+    // SY <--
+
     // SY --> Komiho: 打开「文件夹快捷方式」——与 openLocationInApp 的区别是：快捷方式的
     // target 本身就是**目录**（不是文件），所以本地要保留最后一段（不 dropLast），
     // WebDAV 的 dirUrl 也直接作为目录定位。两者都先切到对应来源再置导航请求。
@@ -1017,16 +1059,17 @@ private fun KomgaMainScreen(
             "opening source=${entry.id} manga=${last.mangaId} chapter=${last.chapterId} " +
                 "page=${last.lastPageRead}",
         )
-        // Komiho (2026-10-01): 文件型来源顺手把浏览位置定到书所在目录 —— 退出阅读器后
-        // 落在书籍目录而不是根/上次目录（与历史 tab「打开文件位置」同一路由）。
-        if (entry.kind == SourceKind.Komga) {
-            openSourceFromDashboard(entry)
-        } else {
-            openLocationInApp(last.chapterUrl)
-        }
-        context.startActivity(
+        // Komiho 1.8.7: 浏览位置定位延后到阅读器关闭后再做（openReaderAfterNav），
+        // 否则冷启动转场期间会先画出书架封面再进阅读器。退出阅读器仍落在书所在目录。
+        openReaderAfterNav(
             ReaderActivity.newIntent(context, last.mangaId, last.chapterId, last.lastPageRead.toInt()),
-        )
+        ) {
+            if (entry.kind == SourceKind.Komga) {
+                openSourceFromDashboard(entry)
+            } else {
+                openLocationInApp(last.chapterUrl)
+            }
+        }
     }
 
     // SY --> Komiho: 历史/书签「打开文件位置」应用内跳转（按条目所属来源路由）——
@@ -1420,14 +1463,17 @@ private fun KomgaMainScreen(
                         refreshTick = refreshTick,
                         onOpenSource = ::openSourceFromDashboard,
                         onResumeReading = { entry, mangaId, chapterId, page, chapterUrl ->
-                            // Komiho (2026-10-01): 文件型来源先把浏览位置定到书所在目录（退出
-                            // 阅读器后落在书籍目录）；Komga 保持切源落内容首页。
-                            if (entry.kind == SourceKind.Komga) {
-                                openSourceFromDashboard(entry)
-                            } else {
-                                openLocationInApp(chapterUrl)
+                            // Komiho 1.8.7: 先只开阅读器，目录定位等它关闭后再做——
+                            // 否则入场转场期间「最近」页会先被重组成书架页，封面一闪而过。
+                            openReaderAfterNav(
+                                ReaderActivity.newIntent(context, mangaId, chapterId, page),
+                            ) {
+                                if (entry.kind == SourceKind.Komga) {
+                                    openSourceFromDashboard(entry)
+                                } else {
+                                    openLocationInApp(chapterUrl)
+                                }
                             }
-                            context.startActivity(ReaderActivity.newIntent(context, mangaId, chapterId, page))
                         },
                         onOpenLocation = { openLocationInApp(it) },
                         onOpenShortcut = ::openShortcut,
@@ -1589,6 +1635,11 @@ private fun KomgaMainScreen(
                     MainTab.History -> HistoryTabLocal(
                         refreshTick = refreshTick,
                         onOpenLocation = { openLocationInApp(it) },
+                        onOpenReader = { url, mangaId, chapterId, page ->
+                            openReaderAfterNav(
+                                ReaderActivity.newIntent(context, mangaId, chapterId, page),
+                            ) { openLocationInApp(url) }
+                        },
                         clearOpen = localHistoryClearOpen,
                         onClearOpenChange = { localHistoryClearOpen = it },
                     )
@@ -11082,6 +11133,9 @@ private fun StatColumn(value: String, label: String) {
 private fun HistoryTabLocal(
     refreshTick: Int,
     onOpenLocation: (String) -> Unit,
+    // SY --> Komiho 1.8.7: 续读走「先开阅读器、关闭后再定位目录」，避免书架封面闪现。
+    onOpenReader: (String, Long?, Long?, Int) -> Unit,
+    // SY <--
     clearOpen: Boolean,
     onClearOpenChange: (Boolean) -> Unit,
 ) {
@@ -11222,8 +11276,7 @@ private fun HistoryTabLocal(
                     // Komiho (2026-10-01): 顺手把浏览位置定到书所在目录 —— 退出阅读器后落在
                     // 书籍目录而不是根/上次目录。
                     if (!missing) {
-                        onOpenLocation(rep.chapterUrl)
-                        context.startActivity(ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, rep.lastPageRead.toInt()))
+                        onOpenReader(rep.chapterUrl, rep.mangaId, rep.chapterId, rep.lastPageRead.toInt())
                     }
                 },
                 moreMenu = { dismiss ->
@@ -11234,11 +11287,8 @@ private fun HistoryTabLocal(
                                 dismiss()
                                 // page=0：ChapterLoader 里 requestedPage = page ?: last_page_read，
                                 // 传 0 会强制从第 1 页开始，且不删除历史记录。
-                                // Komiho (2026-10-01): 与续读同口径，先定位书籍目录。
-                                onOpenLocation(rep.chapterUrl)
-                                context.startActivity(
-                                    ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, 0),
-                                )
+                                // Komiho 1.8.7: 与续读同口径，目录定位延后到阅读器关闭后。
+                                onOpenReader(rep.chapterUrl, rep.mangaId, rep.chapterId, 0)
                             },
                         )
                     }

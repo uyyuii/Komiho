@@ -54,6 +54,13 @@
     <string name="local_bookmarks_empty">No bookmarks</string>
     <string name="local_history_delete">Delete record</string>
     <string name="local_history_cancel">Cancel</string>
+    <!-- SY --> Komiho lightweight reading stats -->
+    <string name="history_stat_total_time">Total time</string>
+    <string name="history_stat_books">Books</string>
+    <string name="history_stat_deleted">Deleted kept</string>
+    <string name="history_file_deleted">File deleted</string>
+    <string name="local_history_duration">%1$s total</string>
+    <!-- SY <-- -->
     <string name="local_history_clear">Clear history</string>
     <string name="local_history_clear_range">Clear time range</string>
     <string name="local_history_clear_1d">24 hours ago</string>

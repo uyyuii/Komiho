@@ -6397,7 +6397,7 @@ private fun LocalFileBrowser(
                     onClick = {
                         showDeleteConfirm = false
                         fileOpScope.launch {
-                            val (failed, clearedHistory) = withContext(Dispatchers.IO) {
+                            val failed = withContext(Dispatchers.IO) {
                                 val deletedPaths = mutableListOf<String>()
                                 val failed = deleteTargets.filterNot { entry ->
                                     // 路径要在删除**前**取：文件删掉后部分 UniFile 实现已无法反推。
@@ -6415,15 +6415,17 @@ private fun LocalFileBrowser(
                                 // 书签/历史 tab 会缓存 chapterUrl → UniFile；删完必须失效，
                                 // 否则「文件已删除」判定可能命中删除前的旧对象。
                                 if (deletedPaths.isNotEmpty()) fileResolveCache.clear()
-                                // 只清真正删掉的文件：失败项还在磁盘上，历史必须保留。
-                                failed to clearLocalHistoryForPaths(deletedPaths)
+                                // SY --> Komiho 轻量统计：删除文件默认保留阅读历史（时长/进度）。
+                                // 历史页会把「文件已删」的行置灰，用户可在历史页手动删除记录。
+                                // 不再调用 clearLocalHistoryForPaths（它会 resetHistory 抹掉历史）。
+                                failed
+                                // SY <--
                             }
                             exitFileSelection()
                             Toast.makeText(
                                 context,
                                 if (failed.isEmpty()) {
-                                    "已删除 ${deleteTargets.size} 项" +
-                                        (if (clearedHistory > 0) "，清理历史 $clearedHistory 条" else "")
+                                    "已删除 ${deleteTargets.size} 项（阅读记录已保留，可在历史页手动删除）"
                                 } else {
                                     "删除完成，失败 ${failed.size} 项（只读或无写入权限）"
                                 },
@@ -10061,6 +10063,21 @@ private fun formatDateTime(timeMs: Long): String {
     return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timeMs))
 }
 
+/** SY --> Komiho 轻量阅读统计：把累计阅读毫秒数格式化为「X小时Y分」/「Y分Z秒」。 */
+private fun formatReadDuration(durationMs: Long): String {
+    if (durationMs <= 0) return "0分钟"
+    val totalSeconds = durationMs / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return when {
+        hours > 0 -> if (minutes > 0) "${hours}小时${minutes}分" else "${hours}小时"
+        minutes > 0 -> "${minutes}分${seconds}秒"
+        else -> "${seconds}秒"
+    }
+}
+// SY <--
+
 /** 统计本地章节总页数（目录直接数图片；归档/EPUB 用 ArchiveReader 数图片条目）。结果按 URL 缓存，避免滚动反复开档。file 未解析时不缓存（避免陈旧 0）。 */
 private suspend fun countChapterPages(context: Context, url: String, file: UniFile?): Int {
     if (file == null) return 0
@@ -10128,6 +10145,9 @@ private fun LocalFileRow(
     sourceBadge: String? = null,
     /** 文件已删除时置灰、行点击失效；「⋯」菜单仍可用（要留删除书签的入口）。 */
     enabled: Boolean = true,
+    /** SY --> Komiho 轻量阅读统计：本卷累计阅读时长（毫秒），>0 时在元信息行展示。 */
+    readDuration: Long = 0L,
+    // SY <--
     onClick: () -> Unit,
     moreMenu: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
@@ -10244,10 +10264,14 @@ private fun LocalFileRow(
             )
             Spacer(Modifier.height(2.dp))
             // 元信息行：文件大小（远程/未知时不显示）+ 阅读时间（历史/书签行传入，无记录不显示）
+            // SY --> Komiho 轻量阅读统计：末位追加本卷累计阅读时长。
             val metaLine = listOfNotNull(
                 formatFileSize(fileSize).takeIf { fileSize > 0 },
                 formatDateTime(dateTime).takeIf { dateTime > 0 },
+                composeStringResource(R.string.local_history_duration, formatReadDuration(readDuration))
+                    .takeIf { readDuration > 0 },
             ).joinToString(" · ")
+            // SY <--
             Text(
                 text = metaLine,
                 style = MaterialTheme.typography.bodySmall,
@@ -10988,6 +11012,65 @@ private fun DashboardRecentRow(
 }
 // SY <--
 
+/** SY --> Komiho 轻量阅读统计：历史页顶部的统计卡片。
+ *  总时长取当前来源下全部历史记录的 time_read 之和；书籍数按「本」(chapterUrl) 去重；
+ *  文件已删除但记录保留的本数由调用方异步算出传入。 */
+@Composable
+private fun ReadingStatsCard(
+    totalDurationMs: Long,
+    bookCount: Int,
+    deletedCount: Int,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            StatColumn(
+                value = formatReadDuration(totalDurationMs),
+                label = composeStringResource(R.string.history_stat_total_time),
+            )
+            StatColumn(
+                value = bookCount.toString(),
+                label = composeStringResource(R.string.history_stat_books),
+            )
+            StatColumn(
+                value = deletedCount.toString(),
+                label = composeStringResource(R.string.history_stat_deleted),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatColumn(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
+// SY <--
+
 @Composable
 private fun HistoryTabLocal(
     refreshTick: Int,
@@ -11049,12 +11132,26 @@ private fun HistoryTabLocal(
             .sortedByDescending { it.rep.readAt?.time ?: 0L }
     }
 
+    // SY --> Komiho 轻量阅读统计：总时长取全部会话 time_read 之和；已删书数按「本」异步探测。
+    val totalDurationMs = remember(items) { items.sumOf { it.readDuration } }
+    val deletedCount by produceState(initialValue = 0, key1 = merged, key2 = queryTick, key3 = refreshTick) {
+        value = withContext(Dispatchers.IO) {
+            merged.count { book -> !localChapterFileAvailable(book.rep.chapterUrl) }
+        }
+    }
+    // SY <--
+
     if (merged.isEmpty() && items.isEmpty()) {
         LocalEmptyHint(Icons.Filled.History, composeStringResource(R.string.local_history_empty))
         return
     }
 
     LazyColumn(Modifier.fillMaxSize(), state = listState) {
+        // SY --> Komiho 轻量阅读统计：顶部统计卡片（总时长 / 书籍数 / 已删保留数）。
+        item(key = "reading_stats") {
+            ReadingStatsCard(totalDurationMs, merged.size, deletedCount)
+        }
+        // SY <--
         items(merged, key = { it.chapterUrl }) { book ->
             val rep = book.rep
             val file by produceState<UniFile?>(initialValue = null, key1 = rep.chapterUrl) {
@@ -11066,6 +11163,20 @@ private fun HistoryTabLocal(
                     ?: ChapterPageCountMemo.get(rep.chapterUrl)
             }
             val stat = remember(rep.chapterUrl, file) { getFileStat(rep.chapterUrl, file) }
+            // SY --> Komiho 轻量统计：记录默认保留，文件已删的行置灰、禁用续读，但保留删除入口。
+            // 三态 null=判定中（先按可用画，避免进 tab 整列表闪灰）；远程章节永远判可用。
+            val fileAvailable by produceState<Boolean?>(
+                initialValue = null,
+                key1 = rep.chapterUrl,
+                key2 = queryTick,
+                key3 = refreshTick,
+            ) {
+                value = withContext(Dispatchers.IO) { localChapterFileAvailable(rep.chapterUrl) }
+            }
+            val missing = fileAvailable == false
+            // 本卷累计时长 = 该卷全部会话 time_read 之和。
+            val bookDurationMs = remember(book) { book.all.sumOf { it.readDuration } }
+            // SY <--
             // SY --> Komiho: 封面改走 LocalCoverFetcher（与 Komga 共用缓存池）。
             // 旧的 resolveCoverUri 只认目录，归档/EPUB 一直没封面；现在归档可拆包取首图。
             // WebDAV 章节（无本地文件）→ 读打开时「顺便」生成的封面缓存（无则占位图标，不触发生成）。
@@ -11079,7 +11190,10 @@ private fun HistoryTabLocal(
             // SY <--
             // 标题取「卷名」（章节名 / chapterUrl 末段），而非系列名；副标题展示系列名。
             val volumeTitle = rep.chapterName.ifBlank { rep.chapterUrl.trimEnd('/').substringAfterLast('/') }
-            val subtitle = rep.mangaTitle
+            // SY --> Komiho 轻量统计：文件已删时在副标题标注，行置灰（enabled=false）。
+            val subtitle = rep.mangaTitle +
+                (if (missing) " · " + composeStringResource(R.string.history_file_deleted) else "")
+            // SY <--
 
             LocalFileRow(
                 context = context,
@@ -11092,29 +11206,35 @@ private fun HistoryTabLocal(
                 lastPageRead = rep.lastPageRead,
                 totalPages = totalPages,
                 coverModel = coverModel,
+                enabled = !missing,
+                readDuration = bookDurationMs,
                 onClick = {
                     // 直接续读：把历史记录的阅读页码作为 page 传入，绕过 ChapterLoader/ReaderViewModel
                     // 里「已读章节跳过 last_page_read 恢复」的 !read 守卫（图片文件夹整本=1 章，看完即 read=true，
                     // 否则会固定跳回第一页）。page 为 0-based，与 rep.lastPageRead 一致。
                     // Komiho (2026-10-01): 顺手把浏览位置定到书所在目录 —— 退出阅读器后落在
                     // 书籍目录而不是根/上次目录。
-                    onOpenLocation(rep.chapterUrl)
-                    context.startActivity(ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, rep.lastPageRead.toInt()))
+                    if (!missing) {
+                        onOpenLocation(rep.chapterUrl)
+                        context.startActivity(ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, rep.lastPageRead.toInt()))
+                    }
                 },
                 moreMenu = { dismiss ->
-                    DropdownMenuItem(
-                        text = { Text(composeStringResource(R.string.local_read_from_first)) },
-                        onClick = {
-                            dismiss()
-                            // page=0：ChapterLoader 里 requestedPage = page ?: last_page_read，
-                            // 传 0 会强制从第 1 页开始，且不删除历史记录。
-                            // Komiho (2026-10-01): 与续读同口径，先定位书籍目录。
-                            onOpenLocation(rep.chapterUrl)
-                            context.startActivity(
-                                ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, 0),
-                            )
-                        },
-                    )
+                    if (!missing) {
+                        DropdownMenuItem(
+                            text = { Text(composeStringResource(R.string.local_read_from_first)) },
+                            onClick = {
+                                dismiss()
+                                // page=0：ChapterLoader 里 requestedPage = page ?: last_page_read，
+                                // 传 0 会强制从第 1 页开始，且不删除历史记录。
+                                // Komiho (2026-10-01): 与续读同口径，先定位书籍目录。
+                                onOpenLocation(rep.chapterUrl)
+                                context.startActivity(
+                                    ReaderActivity.newIntent(context, rep.mangaId, rep.chapterId, 0),
+                                )
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(composeStringResource(R.string.local_history_delete)) },
                         onClick = {

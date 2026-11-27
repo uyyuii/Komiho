@@ -6,6 +6,12 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.1" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.1[/b]</changelogtext>
+        <changelogtext>[b]New[/b] History stats card: total reading time, book count, and deleted-but-kept count</changelogtext>
+        <changelogtext>[b]New[/b] Each history entry now shows that book's cumulative reading time</changelogtext>
+        <changelogtext>[b]Improved[/b] Deleting a local file now keeps its reading record; deleted-file entries are greyed out and can be removed manually from History</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.0" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.0[/b]</changelogtext>
         <changelogtext>[b]New[/b] Settings → About: "Check for updates on startup" toggle, off by default</changelogtext>

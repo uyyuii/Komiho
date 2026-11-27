@@ -1,5 +1,12 @@
 # Komiho Changelog
 
+## v1.8.1 (2026-11-27)
+
+- New History tab stats card: total reading time, book count, and deleted-but-kept count
+- New Each history entry now shows that book's cumulative reading time
+- Improved Deleting a local file now keeps its reading record (time and progress) by default; deleted-file entries are greyed out and can be removed manually from History
+
+
 ## v1.8.0 (2026-11-27)
 
 - New Settings → About: "Check for updates on startup" toggle, off by default; manual check remains available

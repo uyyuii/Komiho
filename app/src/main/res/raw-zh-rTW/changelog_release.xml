@@ -5,6 +5,12 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.1" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.1[/b]</changelogtext>
+        <changelogtext>[b]新增[/b] 歷史頁統計卡片：總閱讀時長、書籍數、已刪保留數</changelogtext>
+        <changelogtext>[b]新增[/b] 歷史列表每條顯示該書的累計閱讀時長</changelogtext>
+        <changelogtext>[b]優化[/b] 刪除本機檔案預設保留閱讀記錄，已刪條目置灰，可在歷史頁手動刪除</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.0" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.0[/b]</changelogtext>
         <changelogtext>[b]新增[/b] 設定-關於新增「啟動時自動檢查更新」開關，預設關閉</changelogtext>

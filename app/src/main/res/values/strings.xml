@@ -62,6 +62,13 @@
     <string name="local_history_clear_1m">1月前</string>
     <string name="local_history_clear_all">全部</string>
     <string name="local_history_cancel">取消</string>
+    <!-- SY --> Komiho 轻量阅读统计 -->
+    <string name="history_stat_total_time">总时长</string>
+    <string name="history_stat_books">书籍</string>
+    <string name="history_stat_deleted">已删保留</string>
+    <string name="history_file_deleted">文件已删除</string>
+    <string name="local_history_duration">累计 %1$s</string>
+    <!-- SY <-- -->
     <string name="local_bookmark_remove">取消书签</string>
     <string name="local_open_file_location">打开文件位置</string>
     <!-- SY: Komiho 阅读器内按页书签 -->

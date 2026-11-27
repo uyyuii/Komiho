@@ -30,7 +30,7 @@ jobs:
           OK=0
           for attempt in 1 2 3 4 5; do
             rm -f "$APK"
-            gh release download "$TAG" --repo "${{ github.repository }}" -p '*.apk' -D /tmp -O komiho.apk || true
+            gh release download "$TAG" --repo "${{ github.repository }}" -p '*.apk' -O "$APK" --clobber || true
             if [ -f "$APK" ]; then
               GOT=$(stat -c%s "$APK")
               echo "attempt $attempt: got $GOT / $EXPECT"

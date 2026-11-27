@@ -13,27 +13,51 @@ jobs:
         with:
           ref: main
 
-      - name: Download latest APK and split into chunks
+      - name: Download APK with size verification and split
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           TAG=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName -q '.[0].tagName')
           echo "Staging release: $TAG"
-          mkdir -p /tmp/stage
-          gh release download "$TAG" --repo "${{ github.repository }}" -p '*.apk' -D /tmp/stage
-          APK=$(find /tmp/stage -name '*.apk' | head -1)
-          SIZE=$(stat -c%s "$APK")
-          echo "APK size: $SIZE"
+
+          # 从 API 拿 asset 的权威大小与下载 URL（CI 内可直连 github.com）
+          ASSET=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '.assets[] | select(.name=="komiho-fork-arm64-v8a.apk")')
+          EXPECT=$(echo "$ASSET" | jq -r '.size')
+          echo "Expected APK size from API: $EXPECT"
+
+          APK="/tmp/komiho.apk"
+          OK=0
+          for attempt in 1 2 3 4 5; do
+            rm -f "$APK"
+            gh release download "$TAG" --repo "${{ github.repository }}" -p '*.apk' -D /tmp -O komiho.apk || true
+            if [ -f "$APK" ]; then
+              GOT=$(stat -c%s "$APK")
+              echo "attempt $attempt: got $GOT / $EXPECT"
+              if [ "$GOT" -eq "$EXPECT" ]; then OK=1; break; fi
+            fi
+            sleep 5
+          done
+          if [ "$OK" -ne 1 ]; then
+            echo "::error::could not download full APK after 5 attempts"
+            exit 1
+          fi
+
           rm -rf apk-staging && mkdir apk-staging
           split -b 500000 "$APK" apk-staging/chunk_
+          CHUNKSUM=$(cat apk-staging/chunk_* | wc -c)
+          echo "chunk sum: $CHUNKSUM (source $EXPECT)"
+          if [ "$CHUNKSUM" -ne "$EXPECT" ]; then
+            echo "::error::chunk sum mismatch"
+            exit 1
+          fi
           echo "$TAG" > apk-staging/TAG.txt
-          echo "$SIZE" > apk-staging/SIZE.txt
-          ls -la apk-staging/
+          echo "$EXPECT" > apk-staging/SIZE.txt
+          sha256sum "$APK" | cut -d' ' -f1 > apk-staging/SHA256.txt
           git config user.name ci-bot
           git config user.email ci@users.noreply.github.com
           git checkout -B apk-delivery
           git add -f apk-staging
-          git commit -m "stage APK chunks from $TAG"
+          git commit -m "stage verified APK chunks from $TAG"
           git push -f origin apk-delivery
-          echo "Staged to apk-delivery branch"
+          echo "Staged complete APK to apk-delivery branch"

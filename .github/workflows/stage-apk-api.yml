@@ -54,6 +54,10 @@ jobs:
           echo "$TAG" > apk-staging/TAG.txt
           echo "$EXPECT" > apk-staging/SIZE.txt
           sha256sum "$APK" | cut -d' ' -f1 > apk-staging/SHA256.txt
+          # 关键：仓库根 .gitattributes 有 "* text=auto"，二进制分块会被 Git 做 CRLF→LF
+          # 转换，每块悄悄丢字节（上次 161 块合计少 968 字节，ZIP 校验失败）。
+          # 在本目录声明全部为 binary，保证分块按原始字节入库。
+          printf '* -text\n' > apk-staging/.gitattributes
           git config user.name ci-bot
           git config user.email ci@users.noreply.github.com
           git checkout -B apk-delivery

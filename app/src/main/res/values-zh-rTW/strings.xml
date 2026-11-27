@@ -52,13 +52,13 @@
     <string name="local_bookmarks_empty">暫無書籤</string>
     <string name="local_history_delete">刪除紀錄</string>
     <string name="local_history_cancel">取消</string>
-    <!-- SY --> Komiho 輕量閱讀統計 -->
+    <!-- Komiho reading stats -->
     <string name="history_stat_total_time">總時長</string>
     <string name="history_stat_books">書籍</string>
     <string name="history_stat_deleted">已刪保留</string>
     <string name="history_file_deleted">檔案已刪除</string>
     <string name="local_history_duration">累計 %1$s</string>
-    <!-- SY <-- -->
+    <!-- end Komiho reading stats -->
     <string name="local_history_clear">清除歷史</string>
     <string name="local_history_clear_range">清除時間範圍</string>
     <string name="local_history_clear_1d">24小時前</string>

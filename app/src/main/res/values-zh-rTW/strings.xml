@@ -169,6 +169,8 @@
     <string name="feedback_tencent">騰訊問卷</string>
     <string name="feedback_tencent_summary">免登入 · 一分鐘填完</string>
     <string name="about_check_update">檢查更新</string>
+    <string name="settings_auto_check_update">啟動時自動檢查更新</string>
+    <string name="settings_auto_check_update_summary">預設關閉；開啟後每次啟動都會連線檢查新版本</string>
     <string name="about_up_to_date">已是最新版本</string>
     <string name="about_os_too_old">目前系統版本過低，無法接收更新</string>
     <string name="about_description">支援 Komga、本機、WebDAV、SMB 的漫畫閱讀器</string>

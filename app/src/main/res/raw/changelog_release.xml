@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.0" changeDate="November 27,2026">
+        <changelogtext>[b]Komiho 1.8.0[/b]</changelogtext>
+        <changelogtext>[b]新增[/b] 设置-关于新增「启动时自动检查更新」开关，默认关闭</changelogtext>
+        <changelogtext>[b]新增[/b] PDF 裁边留白设置（−/+ 调节，仅 PDF 阅读生效）</changelogtext>
+        <changelogtext>[b]新增[/b] 最近页文件夹快捷方式（三点菜单删除）</changelogtext>
+        <changelogtext>[b]优化[/b] 本地 ZIP/CBZ/EPUB 改用中央目录索引打开，打开与跳页更快</changelogtext>
+        <changelogtext>[b]优化[/b] 本地文件浏览器删除/新建/重命名/移动后不再跳回首行</changelogtext>
+        <changelogtext>[b]优化[/b] 长按文件改为显示名称/大小/修改时间/路径信息</changelogtext>
+        <changelogtext>[b]修复[/b] 文件夹封面外圈多余的蓝色轮廓</changelogtext>
+        <changelogtext>[b]修复[/b] PDF 裁边留白勾选后不生效</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.7.0" changeDate="November 7,2026">
         <changelogtext>[b]Komiho 1.7.0[/b]</changelogtext>
         <changelogtext>[b]新增[/b] 文件浏览器（本地）现在支持长按文件管理</changelogtext>

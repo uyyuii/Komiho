@@ -5,6 +5,17 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.0" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.0[/b]</changelogtext>
+        <changelogtext>[b]新增[/b] 設定-關於新增「啟動時自動檢查更新」開關，預設關閉</changelogtext>
+        <changelogtext>[b]新增[/b] PDF 裁邊留白設定（−/+ 調整，僅 PDF 閱讀生效）</changelogtext>
+        <changelogtext>[b]新增[/b] 最近頁資料夾捷徑（三點選單刪除）</changelogtext>
+        <changelogtext>[b]優化[/b] 本機 ZIP/CBZ/EPUB 改用中央目錄索引開啟，開啟與跳頁更快</changelogtext>
+        <changelogtext>[b]優化[/b] 本機檔案瀏覽器刪除/新增/重新命名/移動後不再跳回第一行</changelogtext>
+        <changelogtext>[b]優化[/b] 長按檔案改為顯示名稱/大小/修改時間/路徑資訊</changelogtext>
+        <changelogtext>[b]修復[/b] 資料夾封面外圈多餘的藍色輪廓</changelogtext>
+        <changelogtext>[b]修復[/b] PDF 裁邊留白勾選後不生效</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.7.0" changeDate="November 7, 2026">
         <changelogtext>[b]Komiho 1.7.0[/b]</changelogtext>
         <changelogtext>[b]新增[/b] 檔案瀏覽器（本機）現在支援長按檔案管理</changelogtext>

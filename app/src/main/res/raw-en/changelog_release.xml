@@ -6,6 +6,17 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.0" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.0[/b]</changelogtext>
+        <changelogtext>[b]New[/b] Settings → About: "Check for updates on startup" toggle, off by default</changelogtext>
+        <changelogtext>[b]New[/b] PDF crop margin setting (−/+ steps, PDF only)</changelogtext>
+        <changelogtext>[b]New[/b] Folder shortcuts on the Recent tab (three-dot menu to remove)</changelogtext>
+        <changelogtext>[b]Improved[/b] Local ZIP/CBZ/EPUB now open via the central directory index</changelogtext>
+        <changelogtext>[b]Improved[/b] Local file browser no longer jumps back to the first row after file changes</changelogtext>
+        <changelogtext>[b]Improved[/b] Long-press a file now shows name, size, modified time and path</changelogtext>
+        <changelogtext>[b]Fixed[/b] Extra blue outline around folder covers</changelogtext>
+        <changelogtext>[b]Fixed[/b] PDF crop margin not taking effect when enabled</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.7.0" changeDate="November 7, 2026">
         <changelogtext>[b]Komiho 1.7.0[/b]</changelogtext>
         <changelogtext>[b]New[/b] Local file browser now supports long-press file management</changelogtext>

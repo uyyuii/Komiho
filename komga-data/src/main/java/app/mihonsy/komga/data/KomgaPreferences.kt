@@ -165,6 +165,14 @@ class KomgaPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_READER_PROGRESS_BUBBLE_ENABLED, true)
         set(v) = prefs.edit().putBoolean(KEY_READER_PROGRESS_BUBBLE_ENABLED, v).apply()
 
+    /**
+     * Komiho: 启动时自动检查 App 新版本。默认关闭——不联网、不打扰；
+     * 用户可在「设置 → 关于」里手动打开。无论开关状态如何，「检查更新」按钮始终可手动触发。
+     */
+    var autoCheckUpdate: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_CHECK_UPDATE, false)
+        set(v) = prefs.edit().putBoolean(KEY_AUTO_CHECK_UPDATE, v).apply()
+
     // ---- 外观 / 皮肤（M5 启用 Mihon 皮肤）----
     // 明暗模式："SYSTEM"（跟随系统，默认）/ "LIGHT" / "DARK"。
     var themeMode: String
@@ -445,6 +453,10 @@ class KomgaPreferences(context: Context) {
 
         const val KEY_READER_MODE = "reader_mode"
         const val KEY_READER_PROGRESS_BUBBLE_ENABLED = "reader_progress_bubble_enabled"
+
+        /** Komiho: 启动自动检查更新开关，默认 false。 */
+        const val KEY_AUTO_CHECK_UPDATE = "auto_check_update"
+
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_APP_THEME = "app_theme"
         const val KEY_THEME_DARK_AMOLED = "theme_dark_amoled"

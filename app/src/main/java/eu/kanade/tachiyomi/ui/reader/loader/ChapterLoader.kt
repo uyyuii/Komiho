@@ -27,7 +27,7 @@ import mihon.core.common.archive.ArchiveReader
 import mihon.core.common.archive.RemoteScheme
 import mihon.core.common.archive.RemoteZipReader
 import mihon.core.common.archive.WebDavRandomAccessSource
-import mihon.core.common.archive.archiveReader
+import mihon.core.common.archive.indexedArchiveHandle
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
@@ -151,8 +151,10 @@ class ChapterLoader(
             source is LocalSource -> source.getFormat(chapter.chapter).let { format ->
                 when (format) {
                     is Format.Directory -> DirectoryPageLoader(format.file)
-                    is Format.Archive -> ArchivePageLoader(format.file.archiveReader(context))
-                    is Format.Epub -> EpubPageLoader(format.file.archiveReader(context), context)
+                    // SY --> 同步上游 1.8.0：本地 zip/cbz/epub 走中央目录索引，其余回落 libarchive。
+                    is Format.Archive -> ArchivePageLoader(format.file.indexedArchiveHandle(context))
+                    is Format.Epub -> EpubPageLoader(format.file.indexedArchiveHandle(context), context)
+                    // SY <--
                     // SY --> Komiho: 本地 PDF（彩色扫描漫画常见）—— 自写提取内嵌图 + 系统渲染兜底。
                     is Format.Pdf -> PdfPageLoader(format.file, context)
                     // SY --> Komiho: 本地 MOBI/AZW3/AZW —— libmobi 纯抽图（文字书报无图片，同 EPUB）。
@@ -202,7 +204,7 @@ class ChapterLoader(
                 val bookId = dbChapter.url.removePrefix(KomgaSource.BOOK_URL_PREFIX)
                 val cbzPath = KomgaDownloadStore(context).getPath(bookId)
                 if (cbzPath != null && File(cbzPath).exists()) {
-                    ArchivePageLoader(UniFile.fromFile(File(cbzPath))!!.archiveReader(context.applicationContext))
+                    ArchivePageLoader(UniFile.fromFile(File(cbzPath))!!.indexedArchiveHandle(context.applicationContext))
                 } else {
                     HttpPageLoader(chapter, source)
                 }

@@ -642,7 +642,9 @@ private fun KomgaMainScreen(
     // throttles to one real request every 3 days. The result used to be surfaced only
     // as a system notification, and Komiho never requests POST_NOTIFICATIONS, so on
     // Android 13+ it was silently dropped and users saw nothing at all.
+    // Komiho (2026-11-27): 默认不自动检查——只有用户在「设置 → 关于」打开开关后才联网。
     LaunchedEffect(Unit) {
+        if (!prefs.autoCheckUpdate) return@LaunchedEffect
         runCatching { AppUpdateChecker().checkForUpdate(context, forceCheck = false) }
             .onSuccess { result ->
                 if (result is GetApplicationRelease.Result.NewUpdate) {
@@ -5338,6 +5340,9 @@ private fun KomgaAbout(
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    // Komiho (2026-11-27): 启动自动检查更新开关（默认关闭）。
+    val aboutPrefs = remember { KomgaPreferences(context.applicationContext) }
+    var autoCheckUpdate by remember { mutableStateOf(aboutPrefs.autoCheckUpdate) }
     // Komiho: 问题建议反馈的渠道选择弹窗（GitHub / 腾讯问卷）。
     var showFeedbackDialog by remember { mutableStateOf(false) }
 
@@ -5401,6 +5406,17 @@ private fun KomgaAbout(
         Spacer(Modifier.height(20.dp))
 
         // ── 操作项：与设置页其它条目同构的列表行（不再是整宽按钮）──
+        // Komiho (2026-11-27): 自动检测更新默认关闭，开启后仅在启动时联网检查；
+        // 下方「检查更新」按钮始终可手动触发，不受此开关影响。
+        SwitchPreferenceWidget(
+            title = composeStringResource(R.string.settings_auto_check_update),
+            subtitle = composeStringResource(R.string.settings_auto_check_update_summary),
+            checked = autoCheckUpdate,
+            onCheckedChanged = {
+                autoCheckUpdate = it
+                aboutPrefs.autoCheckUpdate = it
+            },
+        )
         // Komiho: 去掉条目间的分割线——只有三项，且线会横贯内容两端显得顶格（用户要求）。
         AboutActionRow(
             title = composeStringResource(R.string.about_changelog),

@@ -171,6 +171,8 @@
     <string name="feedback_tencent">Tencent Survey</string>
     <string name="feedback_tencent_summary">No sign-in · takes a minute</string>
     <string name="about_check_update">Check for updates</string>
+    <string name="settings_auto_check_update">Check for updates on startup</string>
+    <string name="settings_auto_check_update_summary">Off by default; when enabled, checks online for a new version on each launch</string>
     <string name="about_up_to_date">You are on the latest version</string>
     <string name="about_os_too_old">Your Android version is too old for updates</string>
     <string name="about_description">Comic reader for Komga, local files, WebDAV and SMB</string>

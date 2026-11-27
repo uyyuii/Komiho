@@ -1,5 +1,16 @@
 # Komiho Changelog
 
+## v1.8.0 (2026-11-27)
+
+- New Settings → About: "Check for updates on startup" toggle, off by default; manual check remains available
+- New PDF crop margin setting (−/+ 1% steps, 0–20%, PDF only)
+- New Folder shortcuts on the Recent tab (local/WebDAV folders, three-dot menu to remove)
+- Improved Local ZIP/CBZ/EPUB now open via the central directory index for much faster opening and page jumps (synced from upstream 1.8.0)
+- Improved Local file browser no longer jumps back to the first row after deleting, creating, renaming or moving files
+- Improved Long-press a file now shows name, size, modified time and path (multi-select remains in the dialog)
+- Fixed Extra blue outline around folder covers
+- Fixed PDF crop margin not taking effect when enabled (applied on dual-page/byte path, redraw immediately)
+
 ## v1.7.0 (2026-11-07)
 
 - New Local file browser now supports long-press file management

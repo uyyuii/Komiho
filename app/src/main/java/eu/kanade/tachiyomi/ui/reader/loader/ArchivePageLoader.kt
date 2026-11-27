@@ -16,7 +16,9 @@ import mihon.core.common.archive.ArchiveEntry
 import mihon.core.common.archive.ArchivePasswordException
 import tachiyomi.core.common.util.system.ImageUtil
 import uy.kohesive.injekt.injectLazy
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
 
 /**
  * Loader used to load a chapter from an archive file.
@@ -48,7 +50,7 @@ internal class ArchivePageLoader(private val reader: ArchiveHandle) : PageLoader
             tmpDir.mkdirs()
             reader.useEntries { entries ->
                 entries
-                    .filter { it.isFile && ImageUtil.isImage(it.name) { reader.getInputStream(it.name)!! } }
+                    .filter { it.isFile && sniffIsImage(it) }
                     .sortedWith { f1, f2 -> f1.name.compareToCaseInsensitiveNaturalOrder(f2.name) }
                     .forEach { entry ->
                         File(tmpDir, entry.name.substringAfterLast("/"))
@@ -74,7 +76,7 @@ internal class ArchivePageLoader(private val reader: ArchiveHandle) : PageLoader
         } else reader.useEntries { entries ->
         // SY <--
         entries
-            .filter { it.isFile && ImageUtil.isImage(it.name) { reader.getInputStream(it.name)!! } }
+            .filter { it.isFile && sniffIsImage(it) }
             .sortedWith { f1, f2 -> f1.name.compareToCaseInsensitiveNaturalOrder(f2.name) }
             .mapIndexed { i, entry ->
                 // SY -->
@@ -112,6 +114,15 @@ internal class ArchivePageLoader(private val reader: ArchiveHandle) : PageLoader
         check(!isRecycled)
     }
 
+    // SY --> 同步上游 1.8.0：扩展名无法判定时的图片嗅探。
+    /** 只读条目开头一小段（[ArchiveHandle.peek]），不整条读取；嗅探失败按「非图片」处理。 */
+    private fun sniffIsImage(entry: ArchiveEntry): Boolean = ImageUtil.isImage(entry.name) {
+        ByteArrayInputStream(
+            runCatching { reader.peek(entry.name, IMAGE_SNIFF_BYTES) }.getOrNull() ?: ByteArray(0),
+        )
+    }
+    // SY <--
+
     /**
      * SY: 读取单个条目的完整字节。竞态防御（治「Failed to initialize decoder」伪装案）：
      * recycle() 会直接 close ArchiveHandle 且与页面 stream() 无互斥——快速翻页/大跳页/
@@ -127,9 +138,32 @@ internal class ArchivePageLoader(private val reader: ArchiveHandle) : PageLoader
         check(!isRecycled) { "页面读取时章节已被回收（翻页/换章竞态）——重载即恢复" }
         val input = reader.getInputStream(entry.name)
             ?: throw IllegalStateException("归档内取不到条目流：${entry.name}")
-        val bytes = input.buffered().use { it.readBytes() }
+        // SY --> 同步上游 1.8.0：索引实现能给出解压后大小 → 一次精确分配；未知时走分块读取。
+        val expected = runCatching { reader.entrySize(entry.name) }.getOrDefault(-1L)
+        val bytes = input.buffered(64 * 1024).use { readAllBytesCompact(it, expected) }
+        // SY <--
         check(bytes.isNotEmpty()) { "条目读取为空（章节流已被回收关闭）：${entry.name}——重载即恢复" }
         return bytes
+    }
+
+    /** 按 [expectedSize] 精确预分配；预估不准时扩容继续读，实际更短则按实长收敛。 */
+    private fun readAllBytesCompact(input: InputStream, expectedSize: Long): ByteArray {
+        if (expectedSize <= 0 || expectedSize > Int.MAX_VALUE) return input.readBytes()
+        var out = ByteArray(expectedSize.toInt())
+        var offset = 0
+        while (true) {
+            if (offset == out.size) {
+                val next = input.read()
+                if (next < 0) break
+                out = out.copyOf(out.size + maxOf(4096, out.size / 2))
+                out[offset++] = next.toByte()
+            } else {
+                val n = input.read(out, offset, out.size - offset)
+                if (n < 0) break
+                offset += n
+            }
+        }
+        return out.copyOf(offset)
     }
 
     override fun recycle() {
@@ -138,5 +172,10 @@ internal class ArchivePageLoader(private val reader: ArchiveHandle) : PageLoader
         // SY -->
         tmpDir.deleteRecursively()
         // SY <--
+    }
+
+    private companion object {
+        /** 扩展名无法判定时，读条目开头这么多字节做格式嗅探。 */
+        const val IMAGE_SNIFF_BYTES = 32
     }
 }

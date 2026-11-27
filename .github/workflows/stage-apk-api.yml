@@ -26,7 +26,7 @@ jobs:
           SIZE=$(stat -c%s "$APK")
           echo "APK size: $SIZE"
           rm -rf apk-staging && mkdir apk-staging
-          split -b 8000000 "$APK" apk-staging/chunk_
+          split -b 500000 "$APK" apk-staging/chunk_
           echo "$TAG" > apk-staging/TAG.txt
           echo "$SIZE" > apk-staging/SIZE.txt
           ls -la apk-staging/

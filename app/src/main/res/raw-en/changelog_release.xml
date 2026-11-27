@@ -6,6 +6,11 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.2" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.2[/b]</changelogtext>
+        <changelogtext>[b]Fixed[/b] PDF crop margin not taking effect: general crop borders is disabled while margin is on</changelogtext>
+        <changelogtext>[b]Improved[/b] PDF margin color now contrasts with the reading theme, so the gap stays visible on any background</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.1" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.1[/b]</changelogtext>
         <changelogtext>[b]New[/b] History stats card: total reading time, book count, and deleted-but-kept count</changelogtext>

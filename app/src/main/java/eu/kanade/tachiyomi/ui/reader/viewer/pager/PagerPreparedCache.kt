@@ -244,7 +244,10 @@ object PagerPagePreparer {
                             background = null,
                             decodedBitmap = bitmap,
                             enhancementMode = Injekt.get<ReaderPreferences>().enhancementMode.get(),
-                            cropBorders = viewer.config.imageCropBorders,
+                            cropBorders = config.imageCropBorders && !(
+                                page.preRenderedBitmap != null && Injekt.get<ReaderPreferences>()
+                                    .cropBordersDisabledForPdfMargin()
+                                ), // SY: PDF 留白时元数据也记短路后的裁边值
                             // 传真实耗时：之前写死 -1，角标把「已经跑过 AI 的页」显示成跳过。
                             enhanceElapsedMillis = enhanceMs,
                             layoutApplied = true,
@@ -258,7 +261,13 @@ object PagerPagePreparer {
         }
         val streamFn = page.stream ?: return null
         val config = viewer.config
-        val enhancementMode = Injekt.get<ReaderPreferences>().enhancementMode.get()
+        val readerPrefs = Injekt.get<ReaderPreferences>()
+        val enhancementMode = readerPrefs.enhancementMode.get()
+        // SY --> Komiho 修复「PDF 留白不生效」：PDF 页 + 留白开启时裁边必须短路，
+        // 否则字节路径预解码/显示的解码器会把补的纯白边当 border 裁掉。
+        val pdfMarginActive = page.preRenderedBitmap != null && readerPrefs.cropBordersDisabledForPdfMargin()
+        val effectiveCropBorders = config.imageCropBorders && !pdfMarginActive
+        // SY <--
         return withIOContext {
             try {
                 // C：整图一次性物化进内存 Buffer（共享分段），后续所有 peek/回放零重复 IO
@@ -284,7 +293,10 @@ object PagerPagePreparer {
                             enhanceElapsedMillis = -1L,
                             layoutApplied = false,
                         )
-                    finishLayout(viewer, itemSource, isAnimated, enhancementMode, config, page.index, page.skipEnhance)
+                    finishLayout(
+                        viewer, itemSource, isAnimated, enhancementMode, config, page.index, page.skipEnhance,
+                        effectiveCropBorders = effectiveCropBorders,
+                    )
                 } else {
                     val itemSource = mergePure(viewer, page, extraPage, source1, source2, isAnimated, viewHeight)
                     if (itemSource == null) {
@@ -301,7 +313,10 @@ object PagerPagePreparer {
                             layoutApplied = false,
                         )
                     } else {
-                        finishLayout(viewer, itemSource, isAnimated, enhancementMode, config, page.index, page.skipEnhance)
+                        finishLayout(
+                            viewer, itemSource, isAnimated, enhancementMode, config, page.index, page.skipEnhance,
+                            effectiveCropBorders = effectiveCropBorders,
+                        )
                     }
                 }
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
@@ -322,6 +337,9 @@ object PagerPagePreparer {
         config: PagerConfig,
         pageIndex: Int,
         skipEnhance: Boolean,
+        // SY --> Komiho 修复「PDF 留白不生效」：PDF 页 + 留白开启时字节路径预解码不得裁边。
+        effectiveCropBorders: Boolean = config.imageCropBorders,
+        // SY <--
     ): PagerPreparedPage {
         val background = if (!isAnimated) {
             ImageUtil.pageBackground(viewer.activity, itemSource, config.automaticBackground)
@@ -334,7 +352,7 @@ object PagerPagePreparer {
             itemSource,
             isAnimated,
             enhancementMode,
-            config.imageCropBorders,
+            effectiveCropBorders, // SY: PDF 留白时短路裁边，避免补白被解码器裁掉
             pageIndex,
             skipEnhance,
         )

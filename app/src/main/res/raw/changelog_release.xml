@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.2" changeDate="November 27,2026">
+        <changelogtext>[b]Komiho 1.8.2[/b]</changelogtext>
+        <changelogtext>[b]修复[/b] PDF 裁边留白不生效：留白开启时自动关闭通用裁边，白边不再被裁掉</changelogtext>
+        <changelogtext>[b]优化[/b] PDF 留白颜色随阅读主题取对比色，白底浅灰、深色底白色，边距始终可见</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.1" changeDate="November 27,2026">
         <changelogtext>[b]Komiho 1.8.1[/b]</changelogtext>
         <changelogtext>[b]新增[/b] 历史页统计卡片：总阅读时长、书籍数、已删保留数</changelogtext>

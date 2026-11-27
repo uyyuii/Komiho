@@ -166,15 +166,29 @@ class WebtoonPageHolder(
         } else {
             SubsamplingScaleImageView.SCALE_TYPE_FIT_WIDTH
         },
-        cropBorders =
-        (viewer.config.imageCropBorders && viewer.isContinuous) ||
-            (viewer.config.continuousCropBorders && !viewer.isContinuous),
+        // SY --> Komiho 修复「PDF 留白不生效」：PDF 页 + 留白开启时强制关裁边，
+        // 否则解码器把补的纯白边裁掉。普通漫画页无 preRenderedBitmap，不受影响。
+        cropBorders = (
+            (viewer.config.imageCropBorders && viewer.isContinuous) ||
+                (viewer.config.continuousCropBorders && !viewer.isContinuous)
+            ) && !isPdfMarginActive(),
         // Komiho: 深度裁剪边缘只在裁边开启的那条分支上有意义。
         cropBordersAggressive = viewer.config.imageCropBordersAggressive && (
             (viewer.config.imageCropBorders && viewer.isContinuous) ||
                 (viewer.config.continuousCropBorders && !viewer.isContinuous)
-            ),
+            ) && !isPdfMarginActive(),
+        // SY <--
     )
+
+    /** SY --> Komiho: 当前页是 PDF 渲染页且开了裁边留白。 */
+    private fun isPdfMarginActive(): Boolean {
+        if (currentPage.preRenderedBitmap == null) return false
+        return runCatching {
+            uy.kohesive.injekt.Injekt.get<eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences>()
+                .cropBordersDisabledForPdfMargin()
+        }.getOrDefault(false)
+    }
+    // SY <--
 
     /**
      * Called when the view is recycled and added to the view pool.

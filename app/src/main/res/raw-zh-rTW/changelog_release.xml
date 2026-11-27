@@ -5,6 +5,11 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.2" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.2[/b]</changelogtext>
+        <changelogtext>[b]修復[/b] PDF 裁邊留白不生效：留白開啟時自動關閉通用裁邊，白邊不再被裁掉</changelogtext>
+        <changelogtext>[b]優化[/b] PDF 留白顏色隨閱讀主題取對比色，白底淺灰、深色底白色，邊距始終可見</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.1" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.1[/b]</changelogtext>
         <changelogtext>[b]新增[/b] 歷史頁統計卡片：總閱讀時長、書籍數、已刪保留數</changelogtext>

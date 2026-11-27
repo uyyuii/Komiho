@@ -1,5 +1,11 @@
 # Komiho Changelog
 
+## v1.8.2 (2026-11-27)
+
+- Fixed PDF crop margin not taking effect: gap is no longer removed by the general "crop borders" feature when margin is enabled
+- Improved PDF margin color now contrasts with the reading theme (light gray on white themes, white on dark themes) so the gap is always visible
+
+
 ## v1.8.1 (2026-11-27)
 
 - New History tab stats card: total reading time, book count, and deleted-but-kept count

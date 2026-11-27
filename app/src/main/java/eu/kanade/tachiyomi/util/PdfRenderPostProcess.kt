@@ -165,7 +165,15 @@ object PdfRenderPostProcess {
             )
         }.getOrNull() ?: return bitmap
         val canvas = Canvas(padded)
-        canvas.drawColor(Color.WHITE)
+        // SY --> Komiho 修复「留白看不见」：纯白边在白底主题（含 E-Ink 恒白）下与背景同色，
+        // 视觉上完全消失。按当前阅读主题取对比色：白底用浅灰、深色底用纯白，边距始终可见。
+        val marginColor = if (prefs.effectiveReaderTheme == eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences.ReaderTheme.WHITE) {
+            0xFFE8E8E8.toInt()
+        } else {
+            Color.WHITE
+        }
+        canvas.drawColor(marginColor)
+        // SY <--
         canvas.drawBitmap(bitmap, margin.toFloat(), margin.toFloat(), null)
         bitmap.recycle()
         return padded

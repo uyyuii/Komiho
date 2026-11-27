@@ -1,5 +1,10 @@
 # Komiho Changelog
 
+## v1.8.5 (2026-11-27)
+
+- Fixed longer black screen when opening ZIP/CBZ books: removed the global cover memory-cache clear that ran 2 seconds after entering the reader and collided with first-page decoding/GC
+- Improved Kept the three-tier thumbnail cache and concurrency gate without forcing library covers to be decoded again
+
 ## v1.8.4 (2026-11-27)
 
 - Removed the PDF crop-margin setting; PDF pages now use the reader's standard border cropping again

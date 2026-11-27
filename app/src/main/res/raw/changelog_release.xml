@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.5" changeDate="November 27,2026">
+        <changelogtext>[b]Komiho 1.8.5[/b]</changelogtext>
+        <changelogtext>[b]修复[/b] 进入 ZIP/CBZ 漫画首屏黑屏变长：移除进阅读器 2 秒后清空封面内存缓存的逻辑</changelogtext>
+        <changelogtext>[b]优化[/b] 保留缩略图三级缓存与并发闸门，不再额外重复解码书库封面</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.4" changeDate="November 27,2026">
         <changelogtext>[b]Komiho 1.8.4[/b]</changelogtext>
         <changelogtext>[b]移除[/b] PDF 裁边留白设置，PDF 恢复使用阅读器原生裁边</changelogtext>

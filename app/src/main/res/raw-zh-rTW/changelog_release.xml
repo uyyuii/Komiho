@@ -5,6 +5,11 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.5" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.5[/b]</changelogtext>
+        <changelogtext>[b]修復[/b] 進入 ZIP/CBZ 漫畫首屏黑屏變長：移除進閱讀器 2 秒後清空封面記憶體快取的邏輯</changelogtext>
+        <changelogtext>[b]優化[/b] 保留縮圖三級快取與並發閘門，不再額外重複解碼書庫封面</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.4" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.4[/b]</changelogtext>
         <changelogtext>[b]移除[/b] PDF 裁邊留白設定，PDF 恢復使用閱讀器原生裁邊</changelogtext>

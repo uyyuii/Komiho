@@ -6,6 +6,11 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.5" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.5[/b]</changelogtext>
+        <changelogtext>[b]Fixed[/b] Longer black screen when opening ZIP/CBZ books: removed the cover memory-cache clear 2 seconds after entering the reader</changelogtext>
+        <changelogtext>[b]Improved[/b] Kept the three-tier thumbnail cache and concurrency gate without redecoding library covers</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.4" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.4[/b]</changelogtext>
         <changelogtext>[b]Removed[/b] PDF crop-margin setting; standard border cropping is used again</changelogtext>

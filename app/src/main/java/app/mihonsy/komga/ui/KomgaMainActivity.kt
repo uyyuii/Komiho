@@ -10540,11 +10540,18 @@ private fun SourceDashboardPane(
                             .maxByOrNull { it.baseUrl.length }
                             ?.let { webdav.getOrPut("webdav:" + it.id) { Agg() }.add(item) }
                     }
-                    else -> local.add(item)
+                    // Komiho 1.8.6：「最近」页只展示当前还能打开的书。
+                    // 删除本地文件后历史记录本身保留（历史 tab 置灰可手动删），
+                    // 但最近卡片要立刻不再出现；远程 URL 由 localChapterFileAvailable 直接判可用。
+                    else -> if (localChapterFileAvailable(url)) local.add(item)
                 }
             }
             // Komga：历史统一挂在 KomgaSource.ID 下（无记录时卡片回落引导语）。
-            runCatching { repo.getHistoryBySourceDetailed(KomgaSource.ID).first() }.getOrDefault(emptyList()).forEach { komgaLocal.add(it) }
+            // 同上：最近页不展示失效条目；komga:// URL 由 localChapterFileAvailable 判为远程可用。
+            runCatching { repo.getHistoryBySourceDetailed(KomgaSource.ID).first() }
+                .getOrDefault(emptyList())
+                .filter { localChapterFileAvailable(it.chapterUrl) }
+                .forEach { komgaLocal.add(it) }
             // SY: 封面回退链与历史/书签行同口径（本地文件 → WebDAV 缓存 → SMB 缓存）。
             // 注意：Komga 封面不走 coverOf（需挂起解析 Manga + 鉴权 fetcher），单独在下方 suspend 块处理。
             // Komiho (2026-10-02): coverOf 在摘要构建里映射**全量**历史条目，WebDAV 只读缓存

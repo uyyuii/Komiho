@@ -323,23 +323,64 @@ class RemoteZipReader(private val source: RandomAccessSource) : ArchiveHandle {
         val e = entries[entryName] ?: return null
 
         val dataStart = locateData(e)
-        val raw = readFully(dataStart, e.compSize.toInt())
-
-        val payload: ByteArray = when {
-            e.aesStrength != 0 -> decryptAes(e, raw)
-            e.encrypted -> decryptZipCrypto(e, raw)
-            else -> raw
+        // Komiho 1.8.6: 未加密条目不再把整条压缩数据先 readFully 进一个等长 ByteArray。
+        // 首屏大页的这份副本会和后面的解压字节、Okio Buffer 同时驻留，正好卡在解码前，
+        // 是 1.8.0 中央目录路径相比 libarchive 多出来的一跳。改成按块从 source 直接喂给
+        // InflaterInputStream / STORED 流，峰值少一份整页压缩数据，且仍然只定位读一次。
+        // 加密条目必须先拿到整块做解密/校验，保持原路径不变。
+        val payload: InputStream = when {
+            e.aesStrength != 0 -> ByteArrayInputStream(decryptAes(e, readFully(dataStart, e.compSize.toInt())))
+            e.encrypted -> ByteArrayInputStream(decryptZipCrypto(e, readFully(dataStart, e.compSize.toInt())))
+            else -> RegionInputStream(dataStart, e.compSize)
         }
         return when (e.method) {
-            METHOD_STORED -> ByteArrayInputStream(payload)
-            METHOD_DEFLATED -> InflaterInputStream(ByteArrayInputStream(payload), Inflater(true), 64 * 1024)
+            METHOD_STORED -> payload
+            METHOD_DEFLATED -> InflaterInputStream(payload, Inflater(true), 64 * 1024)
             else -> throw IOException("method=${e.method}") // 构造期已过滤，防御
+        }
+    }
+
+    /**
+     * Komiho 1.8.6: 随机源上的一段只读流，按块定位读，不预先分配整条压缩数据的副本。
+     *
+     * 每页独立实例、各自维护 position；[RandomAccessSource.read] 本身按 offset 读，
+     * 不依赖共享游标，所以多页并发安全。块大小兼顾本地 FileChannel（少系统调用）
+     * 与 SMB/WebDAV（它们的 source 内部已有自己的 Range 缓存）。
+     */
+    private inner class RegionInputStream(
+        private val start: Long,
+        private val length: Long,
+    ) : InputStream() {
+        private var position = 0L
+        private var buffer = ByteArray(0)
+        private var bufferPos = 0
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) == 1) one[0].toInt() and 0xFF else -1
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (off < 0 || len < 0 || off + len > b.size) throw IndexOutOfBoundsException()
+            if (len == 0) return 0
+            if (position >= length) return -1
+            if (bufferPos >= buffer.size) {
+                val want = minOf(REGION_READ_CHUNK.toLong(), length - position).toInt()
+                buffer = source.read(start + position, want)
+                bufferPos = 0
+                if (buffer.isEmpty()) return -1
+            }
+            val n = minOf(len, buffer.size - bufferPos)
+            System.arraycopy(buffer, bufferPos, b, off, n)
+            bufferPos += n
+            position += n
+            return n
         }
     }
 
     // SY --> 同步上游 1.8.0：索引路径的格式嗅探 / 精确预分配
     /**
-     * 只读条目开头一小段用于格式嗅探。不能沿用接口默认实现——[getInputStream] 会先把整条
+     * 只读条目开头一小段用于格式嗅探。不能沿用接口默认实现——默认实现（加密条目）会把整条
      * 压缩数据读进内存，对「按条目嗅探」等于把整本图读一遍。这里只取压缩流开头一小段：
      * 图片魔数都在解压结果最前面，几十 KB 压缩输入足够。
      */
@@ -579,6 +620,8 @@ class RemoteZipReader(private val source: RandomAccessSource) : ArchiveHandle {
 
     private companion object {
         const val TAIL_SIZE = 64 * 1024
+        // Komiho 1.8.6: 未加密条目按块直读的块大小（本地 FileChannel / 远程 Range 通用）。
+        const val REGION_READ_CHUNK = 256 * 1024
         // 嗅探时最多读这么多压缩数据：图片魔数在解压结果最前面，几十 KB 输入绰绰有余。
         const val PEEK_COMPRESSED_BYTES = 64 * 1024
         // 构造期 ZipCrypto 整条验证的未压缩大小上限（超过则退回 12B 校验字节，1/256 漏网可接受）

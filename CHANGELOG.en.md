@@ -1,5 +1,10 @@
 # Komiho Changelog
 
+## v1.8.6 (2026-11-27)
+
+- Improved ZIP/CBZ first page: unencrypted entries in the central-directory reader are now streamed in chunks instead of copying the whole compressed entry into memory first, reducing the pre-decode memory peak
+- Fixed Recent and History being linked: deleting a local book now removes it from Recent automatically, while History keeps the greyed-out record for manual deletion
+
 ## v1.8.5 (2026-11-27)
 
 - Fixed longer black screen when opening ZIP/CBZ books: removed the global cover memory-cache clear that ran 2 seconds after entering the reader and collided with first-page decoding/GC

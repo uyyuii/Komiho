@@ -6,6 +6,11 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.6" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.6[/b]</changelogtext>
+        <changelogtext>[b]Improved[/b] ZIP/CBZ first page: unencrypted entries are streamed in chunks instead of pre-copying the whole compressed entry</changelogtext>
+        <changelogtext>[b]Fixed[/b] Recent and History are no longer linked: deleted books disappear from Recent while History keeps a greyed-out record</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.5" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.5[/b]</changelogtext>
         <changelogtext>[b]Fixed[/b] Longer black screen when opening ZIP/CBZ books: removed the cover memory-cache clear 2 seconds after entering the reader</changelogtext>

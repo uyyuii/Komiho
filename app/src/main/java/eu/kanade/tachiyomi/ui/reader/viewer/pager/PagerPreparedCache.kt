@@ -244,7 +244,7 @@ object PagerPagePreparer {
                             background = null,
                             decodedBitmap = bitmap,
                             enhancementMode = Injekt.get<ReaderPreferences>().enhancementMode.get(),
-                            cropBorders = config.imageCropBorders && !(
+                            cropBorders = viewer.config.imageCropBorders && !(
                                 page.preRenderedBitmap != null && Injekt.get<ReaderPreferences>()
                                     .cropBordersDisabledForPdfMargin()
                                 ), // SY: PDF 留白时元数据也记短路后的裁边值

@@ -182,7 +182,7 @@ class WebtoonPageHolder(
 
     /** SY --> Komiho: 当前页是 PDF 渲染页且开了裁边留白。 */
     private fun isPdfMarginActive(): Boolean {
-        if (currentPage.preRenderedBitmap == null) return false
+        if (page?.preRenderedBitmap == null) return false
         return runCatching {
             uy.kohesive.injekt.Injekt.get<eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences>()
                 .cropBordersDisabledForPdfMargin()

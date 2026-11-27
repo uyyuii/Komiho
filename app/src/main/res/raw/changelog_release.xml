@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.3" changeDate="November 27,2026">
+        <changelogtext>[b]Komiho 1.8.3[/b]</changelogtext>
+        <changelogtext>[b]优化[/b] 重做进度条缩略图取图链路：三级缓存 + 并发闸门 + 堆余量准入，修复 SMB/WebDAV 拖动进度条内存溢出崩溃</changelogtext>
+        <changelogtext>[b]优化[/b] 缩略图零复制字节解码，同一页只拉一次原图，重复拖动秒出</changelogtext>
+        <changelogtext>[b]优化[/b] 按住进度条期间只画占位、松手后才取图</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.2" changeDate="November 27,2026">
         <changelogtext>[b]Komiho 1.8.2[/b]</changelogtext>
         <changelogtext>[b]修复[/b] PDF 裁边留白不生效：留白开启时自动关闭通用裁边，白边不再被裁掉</changelogtext>

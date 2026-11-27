@@ -6,6 +6,12 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.3" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.3[/b]</changelogtext>
+        <changelogtext>[b]Improved[/b] Rebuilt progress-bar thumbnail pipeline: 3-tier cache + concurrency gate + heap-budget admission, fixing OOM crashes while scrubbing SMB/WebDAV books</changelogtext>
+        <changelogtext>[b]Improved[/b] Zero-copy byte decoding for thumbnails; each page's source is fetched once, repeated scrubbing is instant</changelogtext>
+        <changelogtext>[b]Improved[/b] Only placeholders are drawn while the seek bar is held; images load on release</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.2" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.2[/b]</changelogtext>
         <changelogtext>[b]Fixed[/b] PDF crop margin not taking effect: general crop borders is disabled while margin is on</changelogtext>

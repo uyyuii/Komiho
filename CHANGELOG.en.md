@@ -1,5 +1,11 @@
 # Komiho Changelog
 
+## v1.8.3 (2026-11-27)
+
+- Improved Rebuilt the reader progress-bar thumbnail pipeline: three-tier cache (memory / disk / on-demand) plus a 3-way concurrency gate and heap-budget admission, fixing out-of-memory crashes while scrubbing SMB / WebDAV books
+- Improved Thumbnails now use zero-copy byte decoding; SMB/WebDAV/archive pages fetch the source once and repeated scrubbing is instant
+- Improved While the seek bar is held down only placeholders are drawn and images load on release; library cover cache is released on demand when the reader is memory-constrained
+
 ## v1.8.2 (2026-11-27)
 
 - Fixed PDF crop margin not taking effect: gap is no longer removed by the general "crop borders" feature when margin is enabled

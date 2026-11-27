@@ -6,6 +6,11 @@
   Keep both files in sync when adding a release.
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.4" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.4[/b]</changelogtext>
+        <changelogtext>[b]Removed[/b] PDF crop-margin setting; standard border cropping is used again</changelogtext>
+        <changelogtext>[b]Fixed[/b] ~1s black screen and slow loading caused by forced full PDFium re-render of every page</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.3" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.3[/b]</changelogtext>
         <changelogtext>[b]Improved[/b] Rebuilt progress-bar thumbnail pipeline: 3-tier cache + concurrency gate + heap-budget admission, fixing OOM crashes while scrubbing SMB/WebDAV books</changelogtext>

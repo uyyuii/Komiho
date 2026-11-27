@@ -511,27 +511,13 @@ class PagerPageHolder(
     private fun viewerImageConfig() = Config(
         zoomDuration = viewer.config.doubleTapAnimDuration,
         minimumScaleType = viewer.config.imageScaleType,
-        // SY --> Komiho 修复「PDF 留白不生效」：PDF 渲染页（preRenderedBitmap != null）
-        // 且留白开启时强制关裁边 —— 否则解码器会把补的纯白边当 border 裁掉。
-        // 普通漫画页没有 preRenderedBitmap，裁边行为不变。
-        cropBorders = viewer.config.imageCropBorders && !isPdfMarginActive(),
-        cropBordersAggressive = viewer.config.imageCropBordersAggressive && !isPdfMarginActive(),
-        // SY <--
+        cropBorders = viewer.config.imageCropBorders,
+        cropBordersAggressive = viewer.config.imageCropBordersAggressive,
         zoomStartPosition = viewer.config.imageZoomType,
         landscapeZoom = viewer.config.landscapeZoom,
         // Komiho: 关掉后双击不再放大，点击翻页才能「抬手即启动」（见 Pager.tapImmediate）。
         doubleTapZoom = viewer.config.pagedDoubleTapZoom,
     )
-
-    /** SY --> Komiho: 当前页是 PDF 渲染页且开了裁边留白。 */
-    private fun isPdfMarginActive(): Boolean {
-        if (page?.preRenderedBitmap == null) return false
-        return runCatching {
-            uy.kohesive.injekt.Injekt.get<eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences>()
-                .cropBordersDisabledForPdfMargin()
-        }.getOrDefault(false)
-    }
-    // SY <--
 
     /**
      * 旧同步管线（保留副作用：双页分割 onPageSplit / 合并 splitDoublePages 与进度回调），

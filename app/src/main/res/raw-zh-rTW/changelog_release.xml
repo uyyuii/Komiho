@@ -5,6 +5,11 @@
   新增版本時三份都要同步。
 -->
 <changelog bulletedList="true">
+    <changelogversion versionName="1.8.4" changeDate="November 27, 2026">
+        <changelogtext>[b]Komiho 1.8.4[/b]</changelogtext>
+        <changelogtext>[b]移除[/b] PDF 裁邊留白設定，PDF 恢復使用閱讀器原生裁邊</changelogtext>
+        <changelogtext>[b]修復[/b] 上一版留白強制逐頁 PDFium 全量渲染導致的進書黑屏約 1 秒、載入變慢</changelogtext>
+    </changelogversion>
     <changelogversion versionName="1.8.3" changeDate="November 27, 2026">
         <changelogtext>[b]Komiho 1.8.3[/b]</changelogtext>
         <changelogtext>[b]優化[/b] 重做進度條縮圖取圖鏈路：三級快取 + 並發閘門 + 堆積記憶體准入，修復 SMB/WebDAV 拖動進度條記憶體洩漏崩潰</changelogtext>

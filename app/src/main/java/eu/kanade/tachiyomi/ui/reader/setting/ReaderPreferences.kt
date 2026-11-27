@@ -185,32 +185,6 @@ class ReaderPreferences(
         false,
     )
 
-    /**
-     * Komiho: PDF 专用「裁边留白」。开启后在 PDF 页四周补一圈白边，比例按较短边计算。
-     * 只由 PDF 渲染管线读取，普通图片/漫画章节不受影响。
-     */
-    val pdfCropMarginEnabled: Preference<Boolean> = preferenceStore.getBoolean(
-        "pref_pdf_crop_margin_enabled",
-        false,
-    )
-
-    /** 留白比例（百分比，0~20），用加减按钮调节。 */
-    val pdfCropMarginPercent: Preference<Int> = preferenceStore.getInt("pref_pdf_crop_margin_percent", 5)
-
-    /**
-     * SY --> Komiho 修复「PDF 留白不生效」：留白开启时，**PDF 页必须关闭通用裁边**。
-     *
-     * 根因：`cropBorders` / `cropBordersAggressive` 的图像解码器（image-decoder 的
-     * `findBorders`）会把纯白边识别为 border 并裁掉 —— 与 `addCropMargin` 补的纯白边
-     * 语义完全相反。用户想「裁边留白」自然会开着裁边，于是补白被即时裁掉，看起来就是
-     * 「设置勾选了却没效果」。位图路径不裁、字节路径裁，所以表现为「时有时无」。
-     *
-     * 这个方法只判断偏好本身；是否 PDF 页由调用方用 `preRenderedBitmap != null` 判定
-     * （只有 PdfPageLoader 会给页面挂这个 provider），这样普通漫画章节的裁边完全不受影响。
-     */
-    fun cropBordersDisabledForPdfMargin(): Boolean = pdfCropMarginEnabled.get()
-    // SY <--
-
     val webtoonSidePadding: Preference<Int> = preferenceStore.getInt("webtoon_side_padding", WEBTOON_PADDING_MIN)
 
     val readerHideThreshold: Preference<ReaderHideThreshold> = preferenceStore.getEnum(
@@ -485,9 +459,6 @@ class ReaderPreferences(
         append('|').append(cropBordersWebtoon.get())
         // Komiho: 深度裁剪边缘改变裁切结果（像素），必须进指纹。
         append('|').append(cropBordersAggressive.get())
-        // Komiho: PDF 裁边留白改变像素，必须进指纹，否则改完比例旧缓存不刷新。
-        append('|').append(if (pdfCropMarginEnabled.get()) 1 else 0)
-        append('|').append(pdfCropMarginPercent.get())
         // Komiho: E-Ink 灰阶化会改变**像素**，所以必须进指纹 —— 否则改了灰阶设置后，
         // pager 的 prepared pages 与 holder 的「这一对页已渲染」守卫都还认旧设置，
         // 用户得退出重进或一直划动才看到变化（与上面几个 AI 档位是同一个道理）。

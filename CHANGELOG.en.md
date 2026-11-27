@@ -1,5 +1,10 @@
 # Komiho Changelog
 
+## v1.8.4 (2026-11-27)
+
+- Removed the PDF crop-margin setting; PDF pages now use the reader's standard border cropping again
+- Fixed the ~1s black screen and slower loading caused by the previous version forcing full PDFium re-rendering of every page
+
 ## v1.8.3 (2026-11-27)
 
 - Improved Rebuilt the reader progress-bar thumbnail pipeline: three-tier cache (memory / disk / on-demand) plus a 3-way concurrency gate and heap-budget admission, fixing out-of-memory crashes while scrubbing SMB / WebDAV books

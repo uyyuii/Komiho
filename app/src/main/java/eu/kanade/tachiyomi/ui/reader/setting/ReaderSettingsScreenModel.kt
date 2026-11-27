@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import tachiyomi.source.local.LocalSource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -28,14 +27,4 @@ class ReaderSettingsScreenModel(
         .map { it.manga }
         .distinctUntilChanged()
         .stateIn(ioCoroutineScope, SharingStarted.Lazily, null)
-
-    /** Komiho: 当前章节是否为 PDF（本地源、章节 url 以 .pdf 结尾）。用于只在 PDF 时显示裁边留白设置。 */
-    val isPdfFlow = readerState
-        .map { state ->
-            val url = state.currentChapter?.chapter?.url ?: return@map false
-            state.manga?.source == LocalSource.ID &&
-                url.substringBefore('?').endsWith(".pdf", ignoreCase = true)
-        }
-        .distinctUntilChanged()
-        .stateIn(ioCoroutineScope, SharingStarted.Lazily, false)
 }
